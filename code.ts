@@ -103,7 +103,7 @@ const formatFontFamily = (fontName: TextNode['fontName']) => {
 const getUniqueClassName = (base: string, context: ExportContext) => {
   const nextCount = (context.nameCounts.get(base) ?? 0) + 1;
   context.nameCounts.set(base, nextCount);
-  return `${base}-${nextCount}`;
+  return nextCount === 1 ? base : `${base}-${nextCount}`;
 };
 
 const getClassForStyle = (

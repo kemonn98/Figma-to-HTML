@@ -1,0 +1,372 @@
+.desktop-1442-1 {
+    display: flex;
+    flex-direction: column;
+    gap: 0px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+  
+  .header-1 {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: center;
+    background: rgba(255, 255, 255, 1);
+  }
+  
+  .flex-row-1 {
+    display: flex;
+    flex-direction: row;
+    gap: 690px;
+    padding: 16px 32px 16px 32px;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .img-1 {
+    width: 143px;
+    height: 55.132530212402344px;
+    border-radius: 0px;
+  }
+  
+  .label-1 {
+    display: flex;
+    flex-direction: row;
+    gap: 32px;
+    padding: 0px 60px 0px 60px;
+    justify-content: flex-start;
+    align-items: center;
+  }
+  
+  .locations-1 {
+    font-size: 16px;
+    line-height: 100%;
+    letter-spacing: 0%;
+    font-family: "Schibsted Grotesk";
+    text-align: left;
+  }
+  
+  .the-difference-1 {
+    font-size: 16px;
+    line-height: 100%;
+    letter-spacing: 0%;
+    font-family: "Schibsted Grotesk";
+    text-align: center;
+  }
+  
+  .button-1 {
+    display: flex;
+    flex-direction: row;
+    gap: 7px;
+    padding: 8px 24px 8px 24px;
+    justify-content: flex-start;
+    align-items: center;
+  }
+  
+  .flex-col-1 {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0px 0px 0px 0px;
+    justify-content: center;
+    align-items: center;
+    background: rgba(183, 17, 0, 1);
+  }
+  
+  .phone-1 {
+    font-size: 10px;
+    line-height: 100%;
+    letter-spacing: 3%;
+    font-family: "Font Awesome 7 Pro";
+    text-align: center;
+  }
+  
+  .flex-col-2 {
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+    padding: 0px 0px 48px 0px;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .flex-row-2 {
+    display: flex;
+    flex-direction: row;
+    gap: 32px;
+    padding: 16px 0px 0px 0px;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .flex-col-3 {
+    display: flex;
+    flex-direction: column;
+    gap: 88px;
+    padding: 0px 0px 0px 0px;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  
+  .flex-col-4 {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+  
+  .flex-col-5 {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+  
+  .label-2 {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.10000000149011612);
+  }
+  
+  .badge-check-1 {
+    font-size: 20px;
+    line-height: 100%;
+    letter-spacing: 3%;
+    font-family: "Font Awesome 7 Sharp";
+    text-align: left;
+  }
+  
+  .the-gold-standard-in-rug-care-1 {
+    font-size: 18px;
+    line-height: 150%;
+    letter-spacing: 0%;
+    font-family: "Switzer";
+    text-align: left;
+  }
+  
+  .hand-washing-full-submersion-rug-cleaning-specialist-1 {
+    font-size: 54px;
+    line-height: 100%;
+    letter-spacing: -5%;
+    font-family: "Schibsted Grotesk";
+    text-align: left;
+  }
+  
+  .the-valleys-experts-hand-wash-oriental-persian-and-fine-rugs-from-synthetics-to-silk-heirlooms-1 {
+    font-size: 16px;
+    line-height: 150%;
+    letter-spacing: 0%;
+    font-family: "Switzer";
+    text-align: left;
+  }
+  
+  .flex-col-6 {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+  
+  .flex-row-3 {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: center;
+  }
+  
+  .flex-col-7 {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 4px 8px 4px;
+    justify-content: flex-start;
+    align-items: flex-start;
+    background: rgba(227, 208, 66, 1);
+  }
+  
+  .box-1 {
+    width: 62px;
+    height: 134px;
+    border-radius: 0px;
+  }
+  
+  .button-2 {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    padding: 8px 24px 8px 24px;
+    justify-content: flex-start;
+    align-items: center;
+    background: rgba(183, 17, 0, 1);
+  }
+  
+  .label-3 {
+    display: flex;
+    flex-direction: row;
+    gap: 24px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: center;
+  }
+  
+  .flex-row-4 {
+    display: flex;
+    flex-direction: row;
+    gap: -5px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: center;
+  }
+  
+  .flex-row-5 {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: center;
+  }
+  
+  .label-4 {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    padding: 0px 0px 0px 0px;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .flex-row-6 {
+    display: flex;
+    flex-direction: row;
+    gap: 3px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: center;
+  }
+  
+  .join-500-valley-homeowners-who-trust-us-with-their-fine-textiles-1 {
+    font-size: 14px;
+    line-height: 150%;
+    letter-spacing: 2%;
+    font-family: "Switzer";
+    text-align: left;
+  }
+  
+  .frame-1 {
+  
+  }
+  
+  .img-2 {
+    width: 420px;
+    height: 558px;
+    border-radius: 8px;
+    flex: 1;
+  }
+  
+  .flex-row-7 {
+    display: flex;
+    flex-direction: row;
+    gap: 9.655172348022461px;
+    padding: 22.931034088134766px 22.931034088134766px 22.931034088134766px 22.931034088134766px;
+    justify-content: flex-start;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.20000000298023224);
+  }
+  
+  .play-1 {
+    font-size: 21.724811553955078px;
+    line-height: 100%;
+    letter-spacing: 0%;
+    font-family: "Font Awesome 7 Pro";
+    text-align: center;
+  }
+  
+  .flex-row-8 {
+    display: flex;
+    flex-direction: row;
+    gap: 0px;
+    padding: 24px 80px 24px 80px;
+    justify-content: center;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.800000011920929);
+  }
+  
+  .flex-row-9 {
+    display: flex;
+    flex-direction: row;
+    gap: 24px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+  
+  .flex-col-8 {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+  
+  .flex-col-9 {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: flex-start;
+    background: rgba(255, 255, 255, 1);
+  }
+  
+  .water-1 {
+    font-size: 16px;
+    line-height: 100%;
+    letter-spacing: 0%;
+    font-family: "Font Awesome 7 Pro";
+    text-align: center;
+  }
+  
+  .flex-col-10 {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0px 0px 0px 0px;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+  
+  .submersion-at-facility-1 {
+    font-size: 16px;
+    line-height: 129.99999523162842%;
+    letter-spacing: 0%;
+    font-family: "Switzer";
+    text-align: left;
+  }
+  
+  .not-surface-steam-cleaning-in-your-driveway-1 {
+    font-size: 14px;
+    line-height: 150%;
+    letter-spacing: 2%;
+    font-family: "Switzer";
+    text-align: left;
+    flex: 1;
+  }
+  
+  
