@@ -101,6 +101,18 @@ const getSolidTextFill = (text: TextNode) => {
   )}, ${a})`;
 };
 
+const getSolidFillFromPaints = (paints: ReadonlyArray<Paint>) => {
+  const fill = paints.find((paint) => paint.type === 'SOLID') as
+    | SolidPaint
+    | undefined;
+  if (!fill) return null;
+  const { r, g, b } = fill.color;
+  const a = fill.opacity ?? 1;
+  return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(
+    b * 255
+  )}, ${a})`;
+};
+
 const isVectorNode = (node: SceneNode) =>
   node.type === 'VECTOR' ||
   node.type === 'LINE' ||
@@ -745,8 +757,29 @@ const nodeToHtmlCss = async (
       inlineStyles.push('position: relative');
       inlineStyles.push('z-index: 1');
     }
-    const textFill = getSolidTextFill(text);
-    if (textFill) inlineStyles.push(`color: ${textFill}`);
+    let textContent = escapeHtml(text.characters);
+    if (text.fills === figma.mixed) {
+      try {
+        const segments = text.getStyledTextSegments(['fills']);
+        textContent = segments
+          .map((segment) => {
+            const paints = segment.fills as ReadonlyArray<Paint>;
+            const segmentFill = Array.isArray(paints)
+              ? getSolidFillFromPaints(paints)
+              : null;
+            const segmentText = escapeHtml(segment.characters);
+            if (!segmentFill) return segmentText;
+            return `<span style="color: ${segmentFill}">${segmentText}</span>`;
+          })
+          .join('');
+      } catch {
+        const textFill = getSolidTextFill(text);
+        if (textFill) inlineStyles.push(`color: ${textFill}`);
+      }
+    } else {
+      const textFill = getSolidTextFill(text);
+      if (textFill) inlineStyles.push(`color: ${textFill}`);
+    }
     if (text.rotation !== 0 && inlineStyles.every((style) => !style.startsWith('transform:'))) {
       inlineStyles.push(`transform: rotate(${text.rotation}deg)`);
     }
@@ -756,9 +789,7 @@ const nodeToHtmlCss = async (
       classes.push('text');
     }
     const inlineStyle = buildInlineStyle(inlineStyles);
-    html += `<p class="${classes.join(' ')}"${inlineStyle}>${escapeHtml(
-      text.characters
-    )}</p>\n`;
+    html += `<p class="${classes.join(' ')}"${inlineStyle}>${textContent}</p>\n`;
   }
 
   if (node.type === 'RECTANGLE') {
