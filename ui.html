@@ -1,0 +1,31 @@
+<h2>Figma to HTML</h2>
+<p>Select an auto-layout frame, then export HTML + CSS.</p>
+<button id="export">Export</button>
+<button id="cancel">Cancel</button>
+
+<h3>HTML</h3>
+<textarea id="html" rows="10" style="width: 100%"></textarea>
+
+<h3>CSS</h3>
+<textarea id="css" rows="10" style="width: 100%"></textarea>
+
+<script>
+document.getElementById('export').onclick = () => {
+  parent.postMessage({ pluginMessage: { type: 'export' } }, '*');
+};
+
+document.getElementById('cancel').onclick = () => {
+  parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*');
+};
+
+onmessage = (event) => {
+  const msg = event.data.pluginMessage;
+  if (msg.type === 'export-result') {
+    document.getElementById('html').value = msg.html;
+    document.getElementById('css').value = msg.css;
+  }
+  if (msg.type === 'error') {
+    alert(msg.message);
+  }
+};
+</script>
