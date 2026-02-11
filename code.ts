@@ -24,6 +24,7 @@ type ExportContext = {
 };
 
 figma.showUI(__html__);
+figma.ui.resize(370, 500);
 
 const sanitizeName = (name: string) =>
   name

@@ -9,14 +9,14 @@ A Figma plugin that exports a selected **frame with auto-layout** to clean **HTM
 - **Input:** One frame selected in Figma that uses **auto-layout** (layout mode is not "None").
 - **Output:** An HTML document and a separate CSS file that reproduce the layout and styling of that frame and its children.
 
-The plugin walks the frame tree, maps Figma’s layout and styles to HTML elements and CSS (utility-style classes + inline styles where needed), and returns both the full HTML and the CSS string (e.g. to save as `index.html` and `styles.css`).
+The plugin walks the frame tree, maps Figma’s layout and styles to HTML elements and CSS (utility-style classes + inline styles where needed), and returns both the full HTML and the CSS string (e.g. to save as `index.html` and `styles.css`). The plugin UI is sized to 370×500px.
 
 ---
 
 ## How to use
 
 1. In Figma, select a **single frame** that has **auto-layout** enabled.
-2. Run the plugin (e.g. Plugins → Figma to HTML, or as you’ve set it up).
+2. Run the plugin (e.g. Plugins → Figma to HTML).
 3. Click **Export** in the plugin UI.
 4. Copy or save the generated HTML and CSS (the UI may offer copy/download; implementation depends on your `ui.html`).
 
@@ -41,11 +41,12 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 
 | Figma node   | HTML element | What’s exported |
 |-------------|--------------|------------------|
-| **Frame**   | `<div>`      | Auto-layout → flex (direction, gap, padding, justify, align), sizing, solid fill, corner radius, rotation, absolute children (relative container). Non–auto-layout frames get fixed width/height. |
-| **Text**    | `<p>`        | Characters (HTML-escaped), font size, weight, line-height, letter-spacing, font family, text align, sizing, absolute position, rotation. |
-| **Rectangle** | `<div>`    | Solid fill, corner radius, width/height (or flex fill), absolute position, rotation. |
+| **Frame**   | `<div>`      | Auto-layout → flex (direction, gap, padding, justify, align), sizing, solid fill, corner radius, rotation, absolute children (relative container). Non–auto-layout frames get fixed width/height. Image fill (no solid) → placeholder background `#e5e7eb`. Non-absolute children get `position: relative` and `z-index: 1` when inside a frame. |
+| **Text**    | `<p>`        | Characters (HTML-escaped), font size, weight, line-height, letter-spacing, font family, text align, sizing, absolute position, rotation. **Text color:** solid fill on node, or per-segment when fills are mixed (`getStyledTextSegments` → `<span style="color: ...">` per segment). |
+| **Rectangle** | `<div>`    | Solid fill, corner radius, width/height (or flex fill), absolute position, rotation. Image fill (no solid) → placeholder background `#e5e7eb`. |
+| **Vector / Line / Ellipse / Polygon / Star / Boolean operation** | `<div>` wrapping SVG | Exported as SVG via `exportAsync({ format: 'SVG' })`, decoded and inlined inside a `<div>` with sizing and position classes (and optional rotation). |
 
-Other node types are not converted (only Frame, Text, Rectangle are handled).
+Other node types are not converted.
 
 ### Styling approach
 
@@ -65,11 +66,12 @@ Other node types are not converted (only Frame, Text, Rectangle are handled).
   - Gap and padding from frame properties; padding can be unified (`p-N`) or per side (`pt-N`, `pr-N`, etc.).  
   - `justify-content` and `align-items` from primary/counter axis alignment.
 - **Sizing**  
-  - Primary axis: fixed size → width/height (depending on direction); fill → `flex: 1` (`flex-1`).  
-  - Counter axis: stretch → `align-self: stretch` (`self-stretch`); otherwise explicit width/height where applicable.  
-  - Text and rectangle nodes get width/height when they don’t fill.
+  - When `layoutSizingHorizontal` / `layoutSizingVertical` exist: **FILL** maps to `flex-1` (primary) or `self-stretch` (counter); **FIXED** gets explicit width/height.  
+  - Otherwise: primary axis fill → `flex: 1` (`flex-1`); counter axis stretch → `align-self: stretch` (`self-stretch`). Text and rectangle get width/height when they don’t fill.  
+  - Frames with auto-layout use primary/counter axis sizing mode (FIXED vs FILL) when not using the explicit layoutSizing* properties.
 - **Absolute positioning**  
   - If a child has absolute positioning, the parent frame gets `position: relative`.  
+  - Absolute child’s `z-index` is set from its index in the parent’s children array to preserve stacking order.  
   - Child’s constraints (min/max/center/stretch) on horizontal and vertical are mapped to `left`/`right`/`top`/`bottom` and, for center, `transform: translateX(-50%)` / `translateY(-50%)` with optional pixel offset.  
   - Rotation is added to `transform` when non-zero.
 
@@ -79,11 +81,14 @@ Other node types are not converted (only Frame, Text, Rectangle are handled).
 - **escapeHtml:** Escape `&`, `<`, `>`, `"`, `'` in text content.
 - **formatNegativeClassValue:** Class-safe value (e.g. negative padding → `neg-N` in class name).
 - **Font weight:** Inferred from font style string (e.g. “Bold” → 700, “Light” → 300).
+- **Fills:** `getSolidFill` (frames/rectangles), `getSolidTextFill` (text), `getSolidFillFromPaints` (mixed text segments); `hasImageFill` to detect image fills and apply placeholder background when there's no solid fill.
+- **Vectors:** `isVectorNode` (VECTOR, LINE, ELLIPSE, POLYGON, STAR, BOOLEAN_OPERATION); `decodeSvgBytes` to turn exported SVG bytes into a string for inlining.
+- **Layout:** `isAbsoluteChild` to decide when to apply absolute positioning vs `position: relative` + `z-index: 1` for stacking.
 
 ### Output format
 
 - **HTML:** Full document with `<!doctype html>`, `<html lang="en">`, head (charset, viewport, title, `<link rel="stylesheet" href="styles.css">`), and body containing the exported markup.
-- **CSS:** All generated rules, sorted by base name and suffix, so you can save it as `styles.css` and use it next to the HTML file.
+- **CSS:** Starts with a reset `p { margin: 0; }`, then all generated rules sorted by base name and suffix. Save as `styles.css` next to the HTML file.
 
 ---
 
