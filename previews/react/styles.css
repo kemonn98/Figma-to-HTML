@@ -1,0 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Sobat+Sans:wght@400;500;600;700&display=swap');
+
+body, p { margin: 0; }
+
+.box {
+  border-radius: 8px;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.flex-row {
+  flex-direction: row;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.font-400 {
+  font-weight: 400;
+}
+
+.fontfam-sobat-sans {
+  font-family: "Sobat Sans";
+}
+
+.gap-0 {
+  gap: 0px;
+}
+
+.gap-3 {
+  gap: 3px;
+}
+
+.gap-8 {
+  gap: 8px;
+}
+
+.gap-16 {
+  gap: 16px;
+}
+
+.gap-19 {
+  gap: 19px;
+}
+
+.gap-40 {
+  gap: 40px;
+}
+
+.gap-48 {
+  gap: 48px;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.items-end {
+  align-items: flex-end;
+}
+
+.items-start {
+  align-items: flex-start;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
+.justify-start {
+  justify-content: flex-start;
+}
+
+.leading-80 {
+  line-height: 80%;
+}
+
+.leading-90 {
+  line-height: 90%;
+}
+
+.p-0 {
+  padding: 0px;
+}
+
+.p-16 {
+  padding: 16px;
+}
+
+.pb-24 {
+  padding-bottom: 24px;
+}
+
+.pl-39 {
+  padding-left: 39px;
+}
+
+.pr-39 {
+  padding-right: 39px;
+}
+
+.pt-24 {
+  padding-top: 24px;
+}
+
+.row-gap-16 {
+  row-gap: 16px;
+}
+
+.self-stretch {
+  align-self: stretch;
+}
+
+.text-14 {
+  font-size: 14px;
+}
+
+.text-100 {
+  font-size: 100px;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.tracking-0 {
+  letter-spacing: 0em;
+}
+
+.tracking-neg-6 {
+  letter-spacing: -0.06em;
+}
+

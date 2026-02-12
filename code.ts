@@ -1,15 +1,20 @@
-type ExportResult = {
-  html: string;
-  css: string;
-};
+type ExportResult =
+  | { format: 'html'; html: string; css: string }
+  | { format: 'react'; jsx: string; css: string };
 
 type ExportMessage =
-  | { type: 'export' }
+  | { type: 'export'; format?: 'html' | 'react' }
   | { type: 'cancel' };
 
-type ExportNode = {
-  html: string;
-};
+type ExportNode = { html: string };
+
+type OutputFormat = 'html' | 'react';
+
+const getClassAttr = (classes: string[], format: OutputFormat) =>
+  format === 'react' ? `className="${classes.join(' ')}"` : `class="${classes.join(' ')}"`;
+
+const getStyleAttr = (styles: string[], format: OutputFormat) =>
+  format === 'react' ? buildReactStyleAttr(styles) : buildInlineStyle(styles);
 
 type ExportContext = {
   nameCounts: Map<string, number>;
@@ -48,6 +53,21 @@ const escapeHtml = (text: string) =>
     };
     return table[match];
   });
+
+const escapeJsxText = (text: string) =>
+  text.replace(/[&<>{}]/g, (match) => {
+    const table: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '{': '&#123;',
+      '}': '&#125;',
+    };
+    return table[match];
+  });
+
+const cssPropToCamel = (prop: string) =>
+  prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
 const mapPrimaryAxis = (val: FrameNode['primaryAxisAlignItems']) => {
   switch (val) {
@@ -786,6 +806,23 @@ const buildInlineStyle = (styles: string[]) => {
   return ` style="${deduped.join('; ')};"`;
 };
 
+const buildReactStyleAttr = (styles: string[]) => {
+  if (styles.length === 0) return '';
+  const seen = new Map<string, string>();
+  for (const s of styles) {
+    const colon = s.indexOf(':');
+    if (colon > 0) {
+      const prop = s.substring(0, colon).trim();
+      const value = s.substring(colon + 1).trim();
+      seen.set(prop, value);
+    }
+  }
+  const entries = Array.from(seen.entries())
+    .map(([k, v]) => `${cssPropToCamel(k)}: '${v.replace(/'/g, "\\'")}'`)
+    .join(', ');
+  return entries ? ` style={{ ${entries} }}` : '';
+};
+
 const getClassForStyle = (
   baseName: string,
   lines: string[],
@@ -812,7 +849,8 @@ const nodeToHtmlCss = async (
   node: SceneNode,
   context: ExportContext,
   parentLayoutMode: FrameNode['layoutMode'] | null = null,
-  parentFrame: FrameNode | null = null
+  parentFrame: FrameNode | null = null,
+  outputFormat: OutputFormat = 'html'
 ): Promise<ExportNode> => {
   let baseName = sanitizeName(node.name) || `node-${node.id.replace(':', '-')}`;
   let className = baseName;
@@ -894,8 +932,7 @@ const nodeToHtmlCss = async (
     if (hasFlexDir && finalClasses.indexOf('flex') < 0) {
       finalClasses.unshift('flex');
     }
-    const inlineStyle = buildInlineStyle(inlineStyles);
-    html += `<div class="${finalClasses.join(' ')}"${inlineStyle}>`;
+    html += `<div ${getClassAttr(finalClasses, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>`;
 
     const childParentLayoutMode =
       frame.layoutMode === 'NONE' ? null : frame.layoutMode;
@@ -906,7 +943,8 @@ const nodeToHtmlCss = async (
         child,
         context,
         childParentLayoutMode,
-        childParentFrame
+        childParentFrame,
+        outputFormat
       );
       html += childExport.html;
     }
@@ -1008,7 +1046,8 @@ const nodeToHtmlCss = async (
         : 1;
       inlineStyles.push(`z-index: ${z}`);
     }
-    let textContent = escapeHtml(text.characters);
+    const escapeText = outputFormat === 'react' ? escapeJsxText : escapeHtml;
+    let textContent = escapeText(text.characters);
     if (text.fills === figma.mixed) {
       try {
         const segments = text.getStyledTextSegments(['fills']);
@@ -1018,8 +1057,11 @@ const nodeToHtmlCss = async (
             const segmentFill = Array.isArray(paints)
               ? getSolidFillFromPaints(paints)
               : null;
-            const segmentText = escapeHtml(segment.characters);
+            const segmentText = escapeText(segment.characters);
             if (!segmentFill) return segmentText;
+            if (outputFormat === 'react') {
+              return `<span style={{ color: '${segmentFill.replace(/'/g, "\\'")}' }}>${segmentText}</span>`;
+            }
             return `<span style="color: ${segmentFill}">${segmentText}</span>`;
           })
           .join('');
@@ -1041,8 +1083,7 @@ const nodeToHtmlCss = async (
       registerUtilityClass('text', [], context);
       classes.push('text');
     }
-    const inlineStyle = buildInlineStyle(inlineStyles);
-    html += `<p class="${classes.join(' ')}"${inlineStyle}>${textContent}</p>\n`;
+    html += `<p ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>${textContent}</p>\n`;
   }
 
   if (node.type === 'RECTANGLE') {
@@ -1084,8 +1125,7 @@ const nodeToHtmlCss = async (
     if (isMeaningfulRotation(rect.rotation) && inlineStyles.every((style) => !style.startsWith('transform:'))) {
       inlineStyles.push(`transform: rotate(${roundPx(rect.rotation)}deg)`);
     }
-    const inlineStyle = buildInlineStyle(inlineStyles);
-    html += `<div class="${classes.join(' ')}"${inlineStyle}></div>\n`;
+    html += `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>\n`;
   }
 
   if (isVectorNode(node)) {
@@ -1108,7 +1148,6 @@ const nodeToHtmlCss = async (
     if (isMeaningfulRotation(node.rotation) && inlineStyles.every((style) => !style.startsWith('transform:'))) {
       inlineStyles.push(`transform: rotate(${roundPx(node.rotation)}deg)`);
     }
-    const inlineStyle = buildInlineStyle(inlineStyles);
 
     const usePlaceholder = hasInvisibleStrokesOnly(node as GeometryMixin);
     if (usePlaceholder) {
@@ -1117,24 +1156,21 @@ const nodeToHtmlCss = async (
       }
       inlineStyles.push('background: #e5e7eb');
       if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
-      const fallbackStyle = buildInlineStyle(inlineStyles);
-      html += `<div class="${classes.join(' ')}"${fallbackStyle}></div>\n`;
+      html += `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>\n`;
     } else {
       try {
         const svgBytes = await node.exportAsync({ format: 'SVG' });
         let svgText = decodeSvgBytes(svgBytes);
         context.svgIdCounter += 1;
         svgText = makeSvgIdsUnique(svgText, `s${context.svgIdCounter}`);
-        const svgWrapped = `<div class="${classes.join(' ')}"${inlineStyle}>${svgText}</div>`;
-        html += `${svgWrapped}\n`;
+        html += `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>${svgText}</div>\n`;
       } catch (vectorErr) {
         if (!inlineStyles.some((s) => s.startsWith('width:') || s.startsWith('height:'))) {
           inlineStyles.push(`width: ${roundDim(node.width)}px`, `height: ${roundDim(node.height)}px`);
         }
         inlineStyles.push('background: #e5e7eb');
         if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
-        const fallbackStyle = buildInlineStyle(inlineStyles);
-        html += `<div class="${classes.join(' ')}"${fallbackStyle}></div>\n`;
+        html += `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>\n`;
       }
     }
   }
@@ -1142,7 +1178,7 @@ const nodeToHtmlCss = async (
   return { html };
 };
 
-const exportSelection = async (): Promise<ExportResult> => {
+const exportSelection = async (format: 'html' | 'react' = 'html'): Promise<ExportResult> => {
   const selection = figma.currentPage.selection[0];
   if (!selection || selection.type !== 'FRAME') {
     throw new Error('Select a frame with auto-layout.');
@@ -1163,8 +1199,17 @@ const exportSelection = async (): Promise<ExportResult> => {
     svgIdCounter: 0,
   };
 
-  const { html: bodyHtml } = await nodeToHtmlCss(frame, context);
-  const css = `body, p { margin: 0; }\n\n` + context.styleEntries
+  const outputFormat: OutputFormat = format;
+  const { html: bodyContent } = await nodeToHtmlCss(frame, context, null, null, outputFormat);
+  const googleFonts = Array.from(context.fontFamiliesUsed)
+    .filter((f) => !/font awesome|awesome/i.test(f))
+    .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@400;500;600;700`)
+    .join('&');
+  const fontImport =
+    googleFonts.length > 0
+      ? `@import url('https://fonts.googleapis.com/css2?${googleFonts}&display=swap');\n\n`
+      : '';
+  const css = fontImport + `body, p { margin: 0; }\n\n` + context.styleEntries
     .sort((a, b) => {
       const baseCompare = a.baseName.localeCompare(b.baseName);
       if (baseCompare !== 0) return baseCompare;
@@ -1172,10 +1217,13 @@ const exportSelection = async (): Promise<ExportResult> => {
     })
     .map((entry) => entry.cssText)
     .join('');
-  const googleFonts = Array.from(context.fontFamiliesUsed)
-    .filter((f) => !/font awesome|awesome/i.test(f))
-    .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@400;500;600;700`)
-    .join('&');
+
+  if (format === 'react') {
+    const indented = '    ' + bodyContent.replace(/\n/g, '\n    ');
+    const jsx = `import './styles.css';\n\nexport default function ExportedComponent() {\n  return (\n${indented}\n  );\n}\n`;
+    return { format: 'react', jsx, css };
+  }
+
   const fontsLink =
     googleFonts.length > 0
       ? `    <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1192,18 +1240,23 @@ const exportSelection = async (): Promise<ExportResult> => {
 ${fontsLink}    <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-${bodyHtml}
+${bodyContent}
   </body>
 </html>`;
-  return { html, css };
+  return { format: 'html', html, css };
 };
 
 figma.ui.onmessage = (msg: ExportMessage) => {
   if (msg.type === 'export') {
     (async () => {
       try {
-        const { html, css } = await exportSelection();
-        figma.ui.postMessage({ type: 'export-result', html, css });
+        const format = msg.format ?? 'html';
+        const result = await exportSelection(format);
+        if (result.format === 'html') {
+          figma.ui.postMessage({ type: 'export-result', format: 'html', html: result.html, css: result.css });
+        } else {
+          figma.ui.postMessage({ type: 'export-result', format: 'react', jsx: result.jsx, css: result.css });
+        }
       } catch (error) {
         figma.ui.postMessage({
           type: 'error',
