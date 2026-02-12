@@ -205,6 +205,8 @@ const formatNegativeClassValue = (value: number) => {
   return value < 0 ? `neg-${absValue}` : `${absValue}`;
 };
 
+const roundPx = (n: number) => Math.round(n * 100) / 100;
+
 const getCornerRadiusStyle = (node: SceneNode) => {
   if ('cornerRadius' in node && node.cornerRadius !== figma.mixed) {
     return `border-radius: ${node.cornerRadius}px`;
@@ -218,10 +220,20 @@ const getStrokeStyles = (node: GeometryMixin): string[] => {
   const stroke = node.strokes.find((p) => p.type === 'SOLID') as SolidPaint | undefined;
   if (!stroke) return styles;
   const w = 'strokeWeight' in node && node.strokeWeight !== figma.mixed ? node.strokeWeight : 1;
+  const align = 'strokeAlign' in node && typeof (node as { strokeAlign?: string }).strokeAlign === 'string'
+    ? (node as { strokeAlign: string }).strokeAlign
+    : 'INSIDE';
   const { r, g, b } = stroke.color;
-  const a = stroke.opacity ?? 1;
+  const a = Math.round((stroke.opacity ?? 1) * 100) / 100;
   const color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
-  styles.push(`border: ${w}px solid ${color}`);
+  if (align === 'INSIDE') {
+    styles.push(`box-shadow: inset 0 0 0 ${w}px ${color}`);
+  } else if (align === 'OUTSIDE') {
+    styles.push(`outline: ${w}px solid ${color}`);
+    styles.push('outline-offset: 0');
+  } else {
+    styles.push(`border: ${w}px solid ${color}`);
+  }
   return styles;
 };
 
@@ -302,33 +314,37 @@ const registerSizingUtilities = (
   const layoutAlign =
     'layoutAlign' in node ? node.layoutAlign : null;
 
+  const addClass = (cls: string) => {
+    if (classes.indexOf(cls) === -1) classes.push(cls);
+  };
+
   if (parentLayoutMode && layoutGrow > 0 && !isAbsolute) {
     registerUtilityClass('flex-1', ['  flex: 1;'], context);
-    classes.push('flex-1');
+    addClass('flex-1');
   }
 
   if (parentLayoutMode && layoutAlign === 'STRETCH' && !isAbsolute) {
     registerUtilityClass('self-stretch', ['  align-self: stretch;'], context);
-    classes.push('self-stretch');
+    addClass('self-stretch');
   }
 
   if (hasLayoutSizing && parentLayoutMode && !isAbsolute) {
     if (sizingHorizontal === 'FILL') {
       if (parentLayoutMode === 'HORIZONTAL') {
         registerUtilityClass('flex-1', ['  flex: 1;'], context);
-        classes.push('flex-1');
+        addClass('flex-1');
       } else if (parentLayoutMode === 'VERTICAL') {
         registerUtilityClass('self-stretch', ['  align-self: stretch;'], context);
-        classes.push('self-stretch');
+        addClass('self-stretch');
       }
     }
     if (sizingVertical === 'FILL') {
       if (parentLayoutMode === 'VERTICAL') {
         registerUtilityClass('flex-1', ['  flex: 1;'], context);
-        classes.push('flex-1');
+        addClass('flex-1');
       } else if (parentLayoutMode === 'HORIZONTAL') {
         registerUtilityClass('self-stretch', ['  align-self: stretch;'], context);
-        classes.push('self-stretch');
+        addClass('self-stretch');
       }
     }
   }
@@ -464,15 +480,22 @@ const registerFlexUtilities = (
       registerUtilityClass('content-between', ['  align-content: space-between;'], context);
       classes.push('content-between');
     }
-    if (frame.counterAxisSpacing != null && frame.counterAxisSpacing > 0) {
-      const rowGapClass = `row-gap-${formatNegativeClassValue(frame.counterAxisSpacing)}`;
-      registerUtilityClass(rowGapClass, [`  row-gap: ${frame.counterAxisSpacing}px;`], context);
-      classes.push(rowGapClass);
+    const counterSpacing = frame.counterAxisSpacing ?? frame.itemSpacing;
+    if (counterSpacing != null && counterSpacing > 0) {
+      if (frame.layoutMode === 'HORIZONTAL') {
+        const rowGapClass = `row-gap-${formatNegativeClassValue(counterSpacing)}`;
+        registerUtilityClass(rowGapClass, [`  row-gap: ${counterSpacing}px;`], context);
+        classes.push(rowGapClass);
+      } else {
+        const colGapClass = `column-gap-${formatNegativeClassValue(counterSpacing)}`;
+        registerUtilityClass(colGapClass, [`  column-gap: ${counterSpacing}px;`], context);
+        classes.push(colGapClass);
+      }
     }
   }
 
-  const isAutoGap =
-    frame.primaryAxisAlignItems === 'SPACE_BETWEEN' && frame.itemSpacing === 0;
+  // When SPACE_BETWEEN, Figma distributes space—don't add fixed gap (handles AUTO spacing)
+  const isAutoGap = frame.primaryAxisAlignItems === 'SPACE_BETWEEN';
   if (!isAutoGap) {
     const gapValue = formatNegativeClassValue(frame.itemSpacing);
     const gapClass = `gap-${gapValue}`;
@@ -651,10 +674,10 @@ const getAbsolutePositionStyles = (
       ? node.constraints
       : { horizontal: 'MIN', vertical: 'MIN' };
 
-  const left = node.x;
-  const top = node.y;
-  const right = parentFrame.width - (node.x + node.width);
-  const bottom = parentFrame.height - (node.y + node.height);
+  const left = roundPx(node.x);
+  const top = roundPx(node.y);
+  const right = roundPx(parentFrame.width - (node.x + node.width));
+  const bottom = roundPx(parentFrame.height - (node.y + node.height));
 
   const transformParts: string[] = [];
 
@@ -664,7 +687,7 @@ const getAbsolutePositionStyles = (
       break;
     case 'CENTER': {
       const centerX = node.x + node.width / 2;
-      const offsetX = centerX - parentFrame.width / 2;
+      const offsetX = roundPx(centerX - parentFrame.width / 2);
       styles.push('left: 50%');
       transformParts.push('translateX(-50%)');
       if (Math.round(offsetX) !== 0) {
@@ -687,7 +710,7 @@ const getAbsolutePositionStyles = (
       break;
     case 'CENTER': {
       const centerY = node.y + node.height / 2;
-      const offsetY = centerY - parentFrame.height / 2;
+      const offsetY = roundPx(centerY - parentFrame.height / 2);
       styles.push('top: 50%');
       transformParts.push('translateY(-50%)');
       if (Math.round(offsetY) !== 0) {
@@ -782,7 +805,7 @@ const nodeToHtmlCss = async (
     if (radius) inlineStyles.push(radius);
     inlineStyles.push(...getStrokeStyles(frame));
     inlineStyles.push(...getEffectsStyles(frame));
-    if (frame.opacity < 1) inlineStyles.push(`opacity: ${frame.opacity}`);
+    if (frame.opacity < 1) inlineStyles.push(`opacity: ${roundPx(frame.opacity)}`);
     const blend = 'blendMode' in frame ? mapBlendMode(frame.blendMode) : null;
     if (blend && blend !== 'normal') inlineStyles.push(`mix-blend-mode: ${blend}`);
     if (frame.clipsContent) inlineStyles.push('overflow: hidden');
@@ -806,8 +829,18 @@ const nodeToHtmlCss = async (
     ) {
       inlineStyles.push('position: relative');
     }
+    const seen = new Set<string>();
+    const finalClasses = classes.filter((c) => {
+      if (seen.has(c)) return false;
+      seen.add(c);
+      return true;
+    });
+    const hasFlexDir = finalClasses.indexOf('flex-col') >= 0 || finalClasses.indexOf('flex-row') >= 0;
+    if (hasFlexDir && finalClasses.indexOf('flex') < 0) {
+      finalClasses.unshift('flex');
+    }
     const inlineStyle = buildInlineStyle(inlineStyles);
-    html += `<div class="${classes.join(' ')}"${inlineStyle}>`;
+    html += `<div class="${finalClasses.join(' ')}"${inlineStyle}>`;
 
     const childParentLayoutMode =
       frame.layoutMode === 'NONE' ? null : frame.layoutMode;
@@ -857,12 +890,14 @@ const nodeToHtmlCss = async (
     }
 
     if (text.letterSpacing !== figma.mixed) {
-      const value = Math.round(text.letterSpacing.value);
-      const trackingClass = `tracking-${formatNegativeClassValue(value)}`;
-      const unit = text.letterSpacing.unit === 'PERCENT' ? '%' : 'px';
+      const value = text.letterSpacing.value;
+      const trackingClass = `tracking-${formatNegativeClassValue(Math.round(value))}`;
+      const cssValue = text.letterSpacing.unit === 'PERCENT'
+        ? `${value / 100}em`
+        : `${Math.round(value)}px`;
       registerUtilityClass(
         trackingClass,
-        [`  letter-spacing: ${value}${unit};`],
+        [`  letter-spacing: ${cssValue};`],
         context
       );
       classes.push(trackingClass);
@@ -941,7 +976,7 @@ const nodeToHtmlCss = async (
       if (textFill) inlineStyles.push(`color: ${textFill}`);
     }
     if (text.paragraphSpacing > 0) inlineStyles.push(`margin-bottom: ${text.paragraphSpacing}px`);
-    if (text.opacity < 1) inlineStyles.push(`opacity: ${text.opacity}`);
+    if (text.opacity < 1) inlineStyles.push(`opacity: ${roundPx(text.opacity)}`);
     if (text.rotation !== 0 && inlineStyles.every((style) => !style.startsWith('transform:'))) {
       inlineStyles.push(`transform: rotate(${text.rotation}deg)`);
     }
@@ -982,7 +1017,7 @@ const nodeToHtmlCss = async (
     if (radius) inlineStyles.push(radius);
     inlineStyles.push(...getStrokeStyles(rect));
     inlineStyles.push(...getEffectsStyles(rect));
-    if (rect.opacity < 1) inlineStyles.push(`opacity: ${rect.opacity}`);
+    if (rect.opacity < 1) inlineStyles.push(`opacity: ${roundPx(rect.opacity)}`);
     const rectBlend = 'blendMode' in rect ? mapBlendMode(rect.blendMode) : null;
     if (rectBlend && rectBlend !== 'normal') inlineStyles.push(`mix-blend-mode: ${rectBlend}`);
     if (rect.rotation !== 0 && inlineStyles.every((style) => !style.startsWith('transform:'))) {
@@ -1008,7 +1043,7 @@ const nodeToHtmlCss = async (
     }
     inlineStyles.push(...getStrokeStyles(node as GeometryMixin));
     inlineStyles.push(...getEffectsStyles(node as BlendMixin));
-    if (node.opacity < 1) inlineStyles.push(`opacity: ${node.opacity}`);
+    if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
     const vecBlend = 'blendMode' in node ? mapBlendMode(node.blendMode) : null;
     if (vecBlend && vecBlend !== 'normal') inlineStyles.push(`mix-blend-mode: ${vecBlend}`);
     if (node.rotation !== 0 && inlineStyles.every((style) => !style.startsWith('transform:'))) {

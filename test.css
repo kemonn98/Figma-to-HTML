@@ -60,18 +60,6 @@ p { margin: 0; }
   gap: 48px;
 }
 
-.gap-134 {
-  gap: 134px;
-}
-
-.gap-282 {
-  gap: 282px;
-}
-
-.gap-680 {
-  gap: 680px;
-}
-
 .items-center {
   align-items: center;
 }
@@ -153,10 +141,10 @@ p { margin: 0; }
 }
 
 .tracking-0 {
-  letter-spacing: 0%;
+  letter-spacing: 0em;
 }
 
 .tracking-neg-6 {
-  letter-spacing: -6%;
+  letter-spacing: -0.06em;
 }
 
