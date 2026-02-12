@@ -1,6 +1,7 @@
 <h2>Figma to HTML</h2>
 <p>Select an auto-layout frame, then export HTML + CSS.</p>
 <button id="export">Export</button>
+<button id="download-zip">Download ZIP</button>
 <button id="cancel">Cancel</button>
 
 <h3>HTML</h3>
@@ -9,6 +10,7 @@
 <h3>CSS</h3>
 <textarea id="css" rows="10" style="width: 100%"></textarea>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 document.getElementById('export').onclick = () => {
   parent.postMessage({ pluginMessage: { type: 'export' } }, '*');
@@ -18,8 +20,29 @@ document.getElementById('cancel').onclick = () => {
   parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*');
 };
 
+document.getElementById('download-zip').onclick = () => {
+  const html = document.getElementById('html').value;
+  const css = document.getElementById('css').value;
+  if (!html || !css) {
+    alert('Export first to download.');
+    return;
+  }
+  const zip = new JSZip();
+  zip.file('index.html', html);
+  zip.file('styles.css', css);
+  zip.generateAsync({ type: 'blob' }).then((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'figma-export.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+};
+
 onmessage = (event) => {
-  const msg = event.data.pluginMessage;
+  const msg = event.data?.pluginMessage;
+  if (!msg || !msg.type) return;
   if (msg.type === 'export-result') {
     document.getElementById('html').value = msg.html;
     document.getElementById('css').value = msg.css;
