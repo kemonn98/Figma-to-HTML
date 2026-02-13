@@ -49,7 +49,7 @@
   .tabs {
     display: flex;
     padding: 3px;
-    background: #141414;
+    background: #1a1a1a;
     border-radius: 8px;
     gap: 2px;
     margin-bottom: 14px;
@@ -77,7 +77,8 @@
   .tab svg { flex-shrink: 0; }
 
   .btn-export {
-    width: 100%;
+    width: fit-content;
+    height: 40px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -88,36 +89,36 @@
     border-radius: 8px;
     border: none;
     cursor: pointer;
-    background: #262626;
+    background: #002beb;
     color: #fafafa;
     box-shadow: 0 2px 8px rgba(0,0,0,0.25);
     transition: background 0.15s, box-shadow 0.15s;
   }
-  .btn-export:hover { background: #333; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .btn-export:hover { background: #0835ff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
   .btn-export:focus-visible { outline: 2px solid #525252; outline-offset: 2px; }
   .btn-export svg { flex-shrink: 0; }
 
-  .progress-wrap {
-    width: 100%;
-    max-width: 260px;
-    height: 3px;
-    background: #1f1f1f;
-    border-radius: 2px;
-    margin-top: 14px;
-    overflow: hidden;
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+  .btn-export .btn-export-dots {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
   }
-  .progress-bar {
-    height: 100%;
-    width: 30%;
-    background: #525252;
-    border-radius: 2px;
-    animation: progress-indeterminate 1.2s ease-in-out infinite;
+  .btn-export.loading .btn-export-text { display: none; }
+  .btn-export.loading .btn-export-dots { display: inline-flex; }
+  .btn-export.loading { pointer-events: none; }
+  .btn-export-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: dot-bounce 0.6s ease-in-out infinite both;
   }
-  .progress-wrap.hidden { display: none; }
-  @keyframes progress-indeterminate {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(400%); }
+  .btn-export-dot:nth-child(2) { animation-delay: 0.1s; }
+  .btn-export-dot:nth-child(3) { animation-delay: 0.2s; }
+  @keyframes dot-bounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+    40% { transform: scale(1); opacity: 1; }
   }
 
   /* Expandable code preview */
@@ -135,57 +136,81 @@
     overflow: hidden;
   }
   .output-section {
-    padding: 0 16px 12px 16px;
+    padding: 0 16px 0 16px;
     animation: fadeIn 0.35s ease-out;
   }
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
   }
-  .code-panel {
-    background: #141414;
+  .code-view {
     border-radius: 10px;
-    margin-bottom: 12px;
     box-shadow: 0 2px 12px rgba(0,0,0,0.25);
     overflow: hidden;
   }
-  .code-panel:last-child { margin-bottom: 0; }
-  .code-panel-header {
+  .code-tabs {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    background: #171717;
+    gap: 0;
+    background: none;
+    min-height: 36px;
   }
-  .code-panel-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+  .code-tab {
+    padding: 6px 14px;
+    background: none;
+    border: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
     color: #737373;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .code-tab:hover { color: #a3a3a3; }
+  .code-tab.active {
+    color: #e5e5e5;
+    background: #1a1a1a;
+  }
+  .code-tab:focus-visible { outline: 2px solid #525252; outline-offset: -2px; }
+  .code-content { 
+    background: #1a1a1a; 
+    border-radius: 10px;
+  }
+  .code-panel {
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  .code-panel.active { display: flex; }
+  .code-panel-header {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    padding: 8px;
+    background: none;
   }
   .code-panel-actions { display: flex; gap: 4px; }
-  .code-area-wrap { padding: 12px; background: #1a1a1a; }
+  .code-area-wrap {
+    flex: 1;
+  }
   .code-area {
     width: 100%;
-    min-height: 80px;
+    height: 100%;
+    min-height: 180px;
     padding: 10px 12px;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', Consolas, monospace;
     font-size: 11px;
     line-height: 1.5;
     color: #d4d4d4;
-    background: #1e1e1e;
+    background: #1a1a1a;
     border: none;
-    border-radius: 6px;
+    border-radius: 0;
     resize: vertical;
     display: block;
-    box-shadow: inset 0 2px 8px rgba(0,0,0,0.35);
   }
-  .code-area:focus { outline: none; box-shadow: inset 0 2px 8px rgba(0,0,0,0.35), 0 0 0 1px #404040; }
-  .code-area::placeholder { color: #6e6e6e; }
+  .code-area:focus { outline: none; box-shadow: inset 0 2px 8px rgba(0,0,0,0.35), 0 0 0 1px #1e1e1e; }
+  .code-area::placeholder { color: #1e1e1e; }
   .code-area { caret-color: #d4d4d4; }
   .code-area::selection { background-color: #264f78; color: #d4d4d4; }
   .code-area::-moz-selection { background-color: #264f78; color: #d4d4d4; }
@@ -212,7 +237,6 @@
   /* Download bar – inside expanded preview, in flow */
   .bottom-bar {
     padding: 12px 16px 16px 16px;
-    border-top: 1px solid #171717;
   }
   .btn-download {
     width: 100%;
@@ -277,45 +301,49 @@
         </button>
       </div>
       <button type="button" id="export" class="btn-export">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Export selected frames
+        <span class="btn-export-text">Export Selected Frames</span>
+        <span class="btn-export-dots" aria-hidden="true">
+          <span class="btn-export-dot"></span>
+          <span class="btn-export-dot"></span>
+          <span class="btn-export-dot"></span>
+        </span>
       </button>
-      <div id="progress-wrap" class="progress-wrap hidden">
-        <div class="progress-bar"></div>
-      </div>
     </div>
   </div>
 
   <div id="preview-wrapper" class="preview-wrapper">
     <div class="preview-inner">
       <section class="output-section">
-        <div class="code-panel">
-          <div class="code-panel-header">
-            <span class="code-panel-label" id="output-label">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6"/><path d="M8 6v12"/></svg>
-              HTML
-            </span>
-            <div class="code-panel-actions">
-              <button type="button" class="btn btn-ghost btn-icon copy-btn" data-target="output" title="Copy">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              </button>
+        <div class="code-view">
+          <div class="code-tabs" role="tablist">
+            <button type="button" class="code-tab active" data-panel="output" role="tab" aria-selected="true" id="tab-output">HTML</button>
+            <button type="button" class="code-tab" data-panel="css" role="tab" aria-selected="false" id="tab-css">CSS</button>
+          </div>
+          <div class="code-content">
+            <div class="code-panel active" id="panel-output" role="tabpanel" aria-labelledby="tab-output">
+              <div class="code-panel-header">
+                <div class="code-panel-actions">
+                  <button type="button" class="btn btn-ghost btn-icon copy-btn" data-target="output" title="Copy">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="code-area-wrap">
+                <textarea id="output" class="code-area" rows="5" placeholder="Exported markup…"></textarea>
+              </div>
             </div>
-          </div>
-          <div class="code-area-wrap">
-            <textarea id="output" class="code-area" rows="5" placeholder="Exported markup…"></textarea>
-          </div>
-        </div>
-        <div class="code-panel">
-          <div class="code-panel-header">
-            <span class="code-panel-label">CSS</span>
-            <div class="code-panel-actions">
-              <button type="button" class="btn btn-ghost btn-icon copy-btn" data-target="css" title="Copy">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              </button>
+            <div class="code-panel" id="panel-css" role="tabpanel" aria-labelledby="tab-css">
+              <div class="code-panel-header">
+                <div class="code-panel-actions">
+                  <button type="button" class="btn btn-ghost btn-icon copy-btn" data-target="css" title="Copy">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="code-area-wrap">
+                <textarea id="css" class="code-area" rows="5" placeholder="Exported styles…"></textarea>
+              </div>
             </div>
-          </div>
-          <div class="code-area-wrap">
-            <textarea id="css" class="code-area" rows="5" placeholder="Exported styles…"></textarea>
           </div>
         </div>
       </section>
@@ -363,8 +391,9 @@
     el._tid = setTimeout(function() { el.classList.remove('visible'); }, 3200);
   }
 
-  function setProgress(visible) {
-    document.getElementById('progress-wrap').classList.toggle('hidden', !visible);
+  function setExportLoading(loading) {
+    var btn = document.getElementById('export');
+    if (btn) btn.classList.toggle('loading', loading);
   }
 
   function setPreviewExpanded(expanded) {
@@ -378,11 +407,33 @@
       showToast('Nothing to copy.', 'info');
       return;
     }
-    navigator.clipboard.writeText(text).then(function() {
-      showToast('Copied to clipboard.', 'success');
-    }).catch(function() {
-      showToast('Copy failed.', 'error');
-    });
+    function fallbackCopy() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      ta.style.top = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        var ok = document.execCommand('copy');
+        if (ok) showToast('Copied to clipboard.', 'success');
+        else showToast('Copy failed.', 'error');
+      } catch (e) {
+        showToast('Copy failed.', 'error');
+      }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(text).then(function() {
+        showToast('Copied to clipboard.', 'success');
+      }).catch(function() {
+        fallbackCopy();
+      });
+    } else {
+      fallbackCopy();
+    }
   }
 
   document.querySelectorAll('.tab').forEach(function(tab) {
@@ -394,14 +445,24 @@
       tab.classList.add('active');
       tab.setAttribute('aria-selected', 'true');
       exportFormat = tab.dataset.format;
-      var label = document.getElementById('output-label');
-      var svg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6"/><path d="M8 6v12"/></svg> ';
-      label.innerHTML = svg + (exportFormat === 'react' ? 'JSX' : 'HTML');
+    };
+  });
+
+  document.querySelectorAll('.code-tab').forEach(function(btn) {
+    btn.onclick = function() {
+      var panelId = btn.dataset.panel;
+      document.querySelectorAll('.code-tab').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.panel === panelId);
+        b.setAttribute('aria-selected', b.dataset.panel === panelId ? 'true' : 'false');
+      });
+      document.querySelectorAll('.code-panel').forEach(function(p) {
+        p.classList.toggle('active', p.id === 'panel-' + panelId);
+      });
     };
   });
 
   document.getElementById('export').onclick = function() {
-    setProgress(true);
+    setExportLoading(true);
     showToast('Exporting…', 'info');
     parent.postMessage({ pluginMessage: { type: 'export', format: exportFormat } }, '*');
   };
@@ -440,7 +501,7 @@
     var msg = event.data && event.data.pluginMessage;
     if (!msg || !msg.type) return;
     if (msg.type === 'export-result') {
-      setProgress(false);
+      setExportLoading(false);
       var content = msg.jsx != null ? msg.jsx : msg.html;
       var receivedFormat = msg.format || (msg.jsx != null ? 'react' : 'html');
       var outputEl = document.getElementById('output');
@@ -455,14 +516,13 @@
           t.setAttribute('aria-selected', active ? 'true' : 'false');
         });
       }
-      var label = document.getElementById('output-label');
-      var svg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6"/><path d="M8 6v12"/></svg> ';
-      label.innerHTML = svg + (exportFormat === 'react' ? 'JSX' : 'HTML');
+      var tabOutput = document.getElementById('tab-output');
+      if (tabOutput) tabOutput.textContent = exportFormat === 'react' ? 'JSX' : 'HTML';
       setPreviewExpanded(true);
       showToast('Export complete.', 'success');
     }
     if (msg.type === 'error') {
-      setProgress(false);
+      setExportLoading(false);
       showToast(msg.message || 'Something went wrong.', 'error');
     }
   };
