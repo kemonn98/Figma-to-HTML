@@ -850,8 +850,14 @@ const nodeToHtmlCss = async (
   context: ExportContext,
   parentLayoutMode: FrameNode['layoutMode'] | null = null,
   parentFrame: FrameNode | null = null,
-  outputFormat: OutputFormat = 'html'
+  outputFormat: OutputFormat = 'html',
+  indent: number = 0,
+  baseIndent: number = 0
 ): Promise<ExportNode> => {
+  // Pretty-print for both HTML and React. HTML uses baseIndent=2 so body content aligns under <body>; React uses 0 and wrapper adds 4 spaces.
+  const openPrefix = (indent === 0 && baseIndent === 0 ? '' : '\n') + '  '.repeat(baseIndent + indent);
+  const closePrefix = '\n' + '  '.repeat(baseIndent + indent);
+  const isReact = outputFormat === 'react';
   let baseName = sanitizeName(node.name) || `node-${node.id.replace(':', '-')}`;
   let className = baseName;
   let html = '';
@@ -932,7 +938,7 @@ const nodeToHtmlCss = async (
     if (hasFlexDir && finalClasses.indexOf('flex') < 0) {
       finalClasses.unshift('flex');
     }
-    html += `<div ${getClassAttr(finalClasses, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>`;
+    html += openPrefix + `<div ${getClassAttr(finalClasses, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>`;
 
     const childParentLayoutMode =
       frame.layoutMode === 'NONE' ? null : frame.layoutMode;
@@ -944,12 +950,14 @@ const nodeToHtmlCss = async (
         context,
         childParentLayoutMode,
         childParentFrame,
-        outputFormat
+        outputFormat,
+        indent + 1,
+        baseIndent
       );
       html += childExport.html;
     }
 
-    html += `</div>`;
+    html += closePrefix + `</div>`;
   }
 
   if (node.type === 'TEXT') {
@@ -1083,7 +1091,7 @@ const nodeToHtmlCss = async (
       registerUtilityClass('text', [], context);
       classes.push('text');
     }
-    html += `<p ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>${textContent}</p>\n`;
+    html += openPrefix + `<p ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>${textContent}</p>`;
   }
 
   if (node.type === 'RECTANGLE') {
@@ -1125,7 +1133,7 @@ const nodeToHtmlCss = async (
     if (isMeaningfulRotation(rect.rotation) && inlineStyles.every((style) => !style.startsWith('transform:'))) {
       inlineStyles.push(`transform: rotate(${roundPx(rect.rotation)}deg)`);
     }
-    html += `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>\n`;
+    html += openPrefix + `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
   }
 
   if (isVectorNode(node)) {
@@ -1156,21 +1164,27 @@ const nodeToHtmlCss = async (
       }
       inlineStyles.push('background: #e5e7eb');
       if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
-      html += `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>\n`;
+      html += openPrefix + `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
     } else {
       try {
         const svgBytes = await node.exportAsync({ format: 'SVG' });
         let svgText = decodeSvgBytes(svgBytes);
         context.svgIdCounter += 1;
         svgText = makeSvgIdsUnique(svgText, `s${context.svgIdCounter}`);
-        html += `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>${svgText}</div>\n`;
+        const svgIndent = '  '.repeat(baseIndent + indent + 1);
+        const indentedSvg = svgText.split('\n').map((line) => svgIndent + line).join('\n').replace(/\s+$/, '');
+        html +=
+          openPrefix +
+          `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>` +
+          '\n' + indentedSvg + '\n' + '  '.repeat(baseIndent + indent) +
+          `</div>`;
       } catch (vectorErr) {
         if (!inlineStyles.some((s) => s.startsWith('width:') || s.startsWith('height:'))) {
           inlineStyles.push(`width: ${roundDim(node.width)}px`, `height: ${roundDim(node.height)}px`);
         }
         inlineStyles.push('background: #e5e7eb');
         if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
-        html += `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>\n`;
+        html += openPrefix + `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
       }
     }
   }
@@ -1200,7 +1214,8 @@ const exportSelection = async (format: 'html' | 'react' = 'html'): Promise<Expor
   };
 
   const outputFormat: OutputFormat = format;
-  const { html: bodyContent } = await nodeToHtmlCss(frame, context, null, null, outputFormat);
+  const baseIndent = format === 'html' ? 2 : 0; // HTML body content indented 2 spaces; React uses 0 and wrapper adds 4
+  const { html: bodyContent } = await nodeToHtmlCss(frame, context, null, null, outputFormat, 0, baseIndent);
   const googleFonts = Array.from(context.fontFamiliesUsed)
     .filter((f) => !/font awesome|awesome/i.test(f))
     .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@400;500;600;700`)
@@ -1209,7 +1224,8 @@ const exportSelection = async (format: 'html' | 'react' = 'html'): Promise<Expor
     googleFonts.length > 0
       ? `@import url('https://fonts.googleapis.com/css2?${googleFonts}&display=swap');\n\n`
       : '';
-  const css = fontImport + `body, p { margin: 0; }\n\n` + context.styleEntries
+  // HTML uses <link> in the document head for fonts; only React CSS needs @import
+  const css = (format === 'react' ? fontImport : '') + `body, p { margin: 0; }\n\n` + context.styleEntries
     .sort((a, b) => {
       const baseCompare = a.baseName.localeCompare(b.baseName);
       if (baseCompare !== 0) return baseCompare;

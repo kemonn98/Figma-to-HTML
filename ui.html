@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 <style>
   * { box-sizing: border-box; }
   body {
@@ -193,27 +194,50 @@
   .code-panel-actions { display: flex; gap: 4px; }
   .code-area-wrap {
     flex: 1;
+    position: relative;
+    min-height: 190px;
   }
-  .code-area {
-    width: 100%;
-    height: 100%;
-    min-height: 180px;
+  .code-display {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
     padding: 10px 12px;
+    overflow: auto;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', Consolas, monospace;
     font-size: 11px;
     line-height: 1.5;
-    color: #d4d4d4;
     background: #1a1a1a;
-    border: none;
     border-radius: 0;
-    resize: vertical;
-    display: block;
   }
-  .code-area:focus { outline: none; box-shadow: inset 0 2px 8px rgba(0,0,0,0.35), 0 0 0 1px #1e1e1e; }
-  .code-area::placeholder { color: #1e1e1e; }
-  .code-area { caret-color: #d4d4d4; }
-  .code-area::selection { background-color: #264f78; color: #d4d4d4; }
-  .code-area::-moz-selection { background-color: #264f78; color: #d4d4d4; }
+  .code-display pre {
+    margin: 0;
+    padding: 0;
+    background: none;
+    font-size: inherit;
+    line-height: inherit;
+  }
+  .code-display code {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: #d4d4d4;
+  }
+  .code-display:empty::before {
+    content: 'Exported code will appear here…';
+    color: #525252;
+    font-style: normal;
+  }
+  .code-area {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
 
   .btn {
     display: inline-flex;
@@ -329,7 +353,8 @@
                 </div>
               </div>
               <div class="code-area-wrap">
-                <textarea id="output" class="code-area" rows="5" placeholder="Exported markup…"></textarea>
+                <div class="code-display" id="output-display" aria-hidden="true"></div>
+                <textarea id="output" class="code-area" rows="1" aria-label="Exported markup"></textarea>
               </div>
             </div>
             <div class="code-panel" id="panel-css" role="tabpanel" aria-labelledby="tab-css">
@@ -341,7 +366,8 @@
                 </div>
               </div>
               <div class="code-area-wrap">
-                <textarea id="css" class="code-area" rows="5" placeholder="Exported styles…"></textarea>
+                <div class="code-display" id="css-display" aria-hidden="true"></div>
+                <textarea id="css" class="code-area" rows="1" aria-label="Exported CSS"></textarea>
               </div>
             </div>
           </div>
@@ -364,9 +390,29 @@
   <span class="toast-message"></span>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
   let exportFormat = 'html';
+
+  function renderHighlightedCode(displayId, code, language) {
+    var el = document.getElementById(displayId);
+    if (!el || typeof Prism === 'undefined') return;
+    if (!code) {
+      el.innerHTML = '';
+      return;
+    }
+    try {
+      var grammar = Prism.languages[language];
+      var highlighted = grammar ? Prism.highlight(code, grammar, language) : Prism.util.encode(code);
+      el.innerHTML = '<pre class="code-pre"><code class="language-' + language + '">' + highlighted + '</code></pre>';
+    } catch (e) {
+      el.innerHTML = '<pre class="code-pre"><code>' + Prism.util.encode(code) + '</code></pre>';
+    }
+  }
 
   function setToastMessage(el, message) {
     const msgEl = el.querySelector('.toast-message');
@@ -520,6 +566,11 @@
       if (tabOutput) tabOutput.textContent = exportFormat === 'react' ? 'JSX' : 'HTML';
       setPreviewExpanded(true);
       showToast('Export complete.', 'success');
+      setTimeout(function() {
+        var markupLang = exportFormat === 'react' ? 'jsx' : 'markup';
+        renderHighlightedCode('output-display', outputEl.value, markupLang);
+        renderHighlightedCode('css-display', cssEl.value, 'css');
+      }, 0);
     }
     if (msg.type === 'error') {
       setExportLoading(false);
