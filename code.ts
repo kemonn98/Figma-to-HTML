@@ -1,6 +1,6 @@
 type ExportResult =
-  | { format: 'html'; html: string; css: string }
-  | { format: 'react'; jsx: string; css: string };
+  | { format: 'html'; html: string; css: string; frameWidth: number; frameHeight: number }
+  | { format: 'react'; jsx: string; css: string; frameWidth: number; frameHeight: number };
 
 type ExportMessage =
   | { type: 'export'; format?: 'html' | 'react' }
@@ -1237,7 +1237,7 @@ const exportSelection = async (format: 'html' | 'react' = 'html'): Promise<Expor
   if (format === 'react') {
     const indented = '    ' + bodyContent.replace(/\n/g, '\n    ');
     const jsx = `import './styles.css';\n\nexport default function ExportedComponent() {\n  return (\n${indented}\n  );\n}\n`;
-    return { format: 'react', jsx, css };
+    return { format: 'react', jsx, css, frameWidth: frame.width, frameHeight: frame.height };
   }
 
   const fontsLink =
@@ -1259,7 +1259,7 @@ ${fontsLink}    <link rel="stylesheet" href="styles.css">
 ${bodyContent}
   </body>
 </html>`;
-  return { format: 'html', html, css };
+  return { format: 'html', html, css, frameWidth: frame.width, frameHeight: frame.height };
 };
 
 figma.ui.onmessage = (msg: ExportMessage) => {
@@ -1269,9 +1269,23 @@ figma.ui.onmessage = (msg: ExportMessage) => {
         const format = msg.format ?? 'html';
         const result = await exportSelection(format);
         if (result.format === 'html') {
-          figma.ui.postMessage({ type: 'export-result', format: 'html', html: result.html, css: result.css });
+          figma.ui.postMessage({
+            type: 'export-result',
+            format: 'html',
+            html: result.html,
+            css: result.css,
+            frameWidth: result.frameWidth,
+            frameHeight: result.frameHeight,
+          });
         } else {
-          figma.ui.postMessage({ type: 'export-result', format: 'react', jsx: result.jsx, css: result.css });
+          figma.ui.postMessage({
+            type: 'export-result',
+            format: 'react',
+            jsx: result.jsx,
+            css: result.css,
+            frameWidth: result.frameWidth,
+            frameHeight: result.frameHeight,
+          });
         }
       } catch (error) {
         figma.ui.postMessage({

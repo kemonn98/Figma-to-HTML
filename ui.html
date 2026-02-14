@@ -1,4 +1,5 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
   * { box-sizing: border-box; }
   body {
@@ -32,7 +33,6 @@
   }
   .hero-inner {
     width: 100%;
-    max-width: 260px;
     text-align: center;
   }
   .hero h1 {
@@ -47,6 +47,7 @@
     font-size: 12px;
     color: #737373;
   }
+  /* Shared control: 36px height, 12px/500 font, 8px radius, same focus ring */
   .tabs {
     display: flex;
     padding: 3px;
@@ -58,7 +59,9 @@
   }
   .tab {
     flex: 1;
-    padding: 8px 12px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 12px;
     background: none;
     border: none;
     border-radius: 6px;
@@ -76,17 +79,19 @@
   .tab.active { color: #e5e5e5; background: #262626; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
   .tab:focus-visible { outline: 2px solid #525252; outline-offset: 2px; }
   .tab svg { flex-shrink: 0; }
+  .tab .fa { flex-shrink: 0; font-size: 14px; }
 
   .btn-export {
     width: fit-content;
-    height: 40px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 16px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 12px 16px;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
     border-radius: 8px;
     border: none;
     cursor: pointer;
@@ -98,6 +103,123 @@
   .btn-export:hover { background: #0835ff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
   .btn-export:focus-visible { outline: 2px solid #525252; outline-offset: 2px; }
   .btn-export svg { flex-shrink: 0; }
+  .btn-export .fa { flex-shrink: 0; }
+  .btn-export-text { display: inline-flex; align-items: center; gap: 8px; }
+
+  /* Preview canvas – below export button */
+  .preview-canvas-wrap {
+    width: 100%;
+    margin-top: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #1a1a1a;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+    border: 1px solid #262626;
+  }
+  .preview-canvas-wrap.has-content {
+    min-height: 120px;
+  }
+  .preview-canvas-header {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 11px;
+    font-weight: 400;
+    color: #ffffff;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #141414;
+    border-bottom: 1px solid #262626;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .preview-canvas-header-title {
+    width: fit-content;
+  }
+  .preview-zoom {
+    display: none;
+    align-items: center;
+    gap: 2px;
+  }
+  .preview-canvas-wrap.has-content .preview-zoom { display: flex; }
+  .preview-zoom-btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #737373;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .preview-zoom-btn:hover { background: #262626; color: #a3a3a3; }
+  .preview-zoom-btn:focus-visible { outline: 2px solid #525252; outline-offset: 2px; }
+  .preview-zoom-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #737373;
+    min-width: 36px;
+    text-align: center;
+  }
+  .preview-canvas {
+    position: relative;
+    min-height: 100px;
+    background: #0f0f0f;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .preview-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    font-size: 12px;
+    color: #525252;
+    padding: 20px;
+  }
+  .preview-canvas-wrap.has-content .preview-placeholder {
+    display: none;
+  }
+  /* Preview: 75% width, content scaled down inside iframe */
+  .preview-iframe-container {
+    display: none;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    overflow: hidden;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    flex-shrink: 0;
+  }
+  .preview-canvas-wrap.has-content .preview-iframe-container {
+    display: block;
+  }
+  .preview-iframe {
+    display: block;
+    width: 100%;
+    min-height: 160px;
+    height: 200px;
+    border: none;
+    background: #1a1a1a;
+  }
+  .preview-react-note {
+    display: none;
+    padding: 16px 20px;
+    margin: 0;
+    font-size: 12px;
+    color: #737373;
+    text-align: center;
+  }
 
   .btn-export .btn-export-dots {
     display: none;
@@ -156,7 +278,9 @@
     min-height: 36px;
   }
   .code-tab {
-    padding: 6px 14px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 14px;
     background: none;
     border: none;
     border-radius: 8px 8px 0 0;
@@ -164,9 +288,13 @@
     font-size: 12px;
     font-weight: 500;
     color: #737373;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     transition: color 0.15s, background 0.15s;
   }
-  .code-tab:hover { color: #a3a3a3; }
+  .code-tab .fa { flex-shrink: 0; font-size: 12px; opacity: 0.9; }
+  .code-tab:hover { color: #a3a3a3; background: #1f1f1f; }
   .code-tab.active {
     color: #e5e5e5;
     background: #1a1a1a;
@@ -240,11 +368,13 @@
   }
 
   .btn {
+    height: 36px;
+    min-height: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 8px 12px;
+    padding: 0 12px;
     font-size: 12px;
     font-weight: 500;
     border-radius: 8px;
@@ -254,9 +384,10 @@
   }
   .btn:focus-visible { outline: 2px solid #525252; outline-offset: 2px; }
   .btn svg { flex-shrink: 0; }
+  .btn .fa { flex-shrink: 0; }
   .btn-ghost { background: transparent; color: #737373; box-shadow: none; }
   .btn-ghost:hover { background: #1f1f1f; color: #a3a3a3; }
-  .btn-icon { padding: 8px; min-width: 32px; }
+  .btn-icon { padding: 0; min-width: 36px; width: 36px; }
 
   /* Download bar – inside expanded preview, in flow */
   .bottom-bar {
@@ -264,11 +395,13 @@
   }
   .btn-download {
     width: 100%;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 16px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 10px 16px;
     font-size: 12px;
     font-weight: 500;
     border-radius: 8px;
@@ -316,22 +449,38 @@
       <p>Select an auto-layout frame, then export.</p>
       <div class="tabs" role="tablist">
         <button type="button" class="tab active" data-format="html" role="tab" aria-selected="true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6"/><path d="M8 6v12"/></svg>
-          HTML + CSS
+          <i class="fa-brands fa-html5" aria-hidden="true"></i>
+          HTML
         </button>
         <button type="button" class="tab" data-format="react" role="tab" aria-selected="false">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+          <i class="fa-brands fa-react" aria-hidden="true"></i>
           React
         </button>
       </div>
       <button type="button" id="export" class="btn-export">
-        <span class="btn-export-text">Export Selected Frames</span>
+        <span class="btn-export-text"><i class="fa-solid fa-code" aria-hidden="true"></i>Export Selected Frames</span>
         <span class="btn-export-dots" aria-hidden="true">
           <span class="btn-export-dot"></span>
           <span class="btn-export-dot"></span>
           <span class="btn-export-dot"></span>
         </span>
       </button>
+      <div id="preview-canvas-wrap" class="preview-canvas-wrap" aria-live="polite">
+        <div class="preview-canvas-header">
+          <span class="preview-canvas-header-title">Preview</span>
+          <div class="preview-zoom">
+            <button type="button" class="preview-zoom-btn" id="preview-zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+            <span class="preview-zoom-label" id="preview-zoom-label">100%</span>
+            <button type="button" class="preview-zoom-btn" id="preview-zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+          </div>
+        </div>
+        <div class="preview-canvas">
+          <p class="preview-placeholder" id="preview-placeholder">Export to see preview.</p>
+          <div class="preview-iframe-container">
+            <iframe id="preview-iframe" class="preview-iframe" title="Exported design preview" sandbox="allow-same-origin allow-scripts"></iframe>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -340,8 +489,8 @@
       <section class="output-section">
         <div class="code-view">
           <div class="code-tabs" role="tablist">
-            <button type="button" class="code-tab active" data-panel="output" role="tab" aria-selected="true" id="tab-output">HTML</button>
-            <button type="button" class="code-tab" data-panel="css" role="tab" aria-selected="false" id="tab-css">CSS</button>
+            <button type="button" class="code-tab active" data-panel="output" role="tab" aria-selected="true" id="tab-output"><i class="fa-solid fa-code" aria-hidden="true"></i><span class="code-tab-label">HTML</span></button>
+            <button type="button" class="code-tab" data-panel="css" role="tab" aria-selected="false" id="tab-css"><i class="fa-solid fa-hashtag" aria-hidden="true"></i><span class="code-tab-label">CSS</span></button>
           </div>
           <div class="code-content">
             <div class="code-panel active" id="panel-output" role="tabpanel" aria-labelledby="tab-output">
@@ -397,6 +546,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
   let exportFormat = 'html';
+  var previewFrameWidth = 0;
+  var previewFrameHeight = 0;
+  var previewFitScale = 1;
+  var previewZoomLevel = 1;
 
   function renderHighlightedCode(displayId, code, language) {
     var el = document.getElementById(displayId);
@@ -444,6 +597,124 @@
 
   function setPreviewExpanded(expanded) {
     document.getElementById('preview-wrapper').classList.toggle('expanded', expanded);
+  }
+
+  function getPreviewContainerSize() {
+    var container = document.querySelector('.preview-iframe-container');
+    var iframe = document.getElementById('preview-iframe');
+    if (!container || !iframe) return { w: 260, h: 200 };
+    return { w: container.clientWidth || 260, h: iframe.offsetHeight || 200 };
+  }
+
+  function applyPreviewZoom() {
+    var iframe = document.getElementById('preview-iframe');
+    if (!iframe || !iframe.contentDocument) return;
+    var root = iframe.contentDocument.getElementById('preview-root');
+    if (!root) return;
+    var scale = previewFitScale * previewZoomLevel;
+    root.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+    root.style.transformOrigin = 'center center';
+    var label = document.getElementById('preview-zoom-label');
+    if (label) label.textContent = Math.round(scale * 100) + '%';
+  }
+
+  function prepareReactScript(jsx) {
+    var code = jsx
+      .replace(/import\s+['"].*?['"]\s*;\s*\n?/g, '')
+      .replace(/\bexport\s+default\s+/g, '');
+    code = code.replace(/<\/script>/gi, '<\\/script>');
+    var renderBlock =
+      'try {\n' +
+      '  if (typeof React === "undefined" || typeof ReactDOM === "undefined") throw new Error("React did not load. External scripts may be blocked.");\n' +
+      '  var __rootEl = document.getElementById("preview-root");\n' +
+      '  var __root = ReactDOM.createRoot(__rootEl);\n' +
+      '  __root.render(React.createElement(ExportedComponent));\n' +
+      '  var __loading = document.getElementById("preview-loading");\n' +
+      '  if (__loading) __loading.remove();\n' +
+      '} catch (e) {\n' +
+      '  var __loading = document.getElementById("preview-loading");\n' +
+      '  if (__loading) __loading.remove();\n' +
+      '  var __el = document.getElementById("preview-root");\n' +
+      '  if (__el) { __el.innerHTML = ""; var __p = document.createElement("p"); __p.style.cssText = "padding:16px;color:#c00;font-family:sans-serif;font-size:12px;max-width:280px;"; __p.textContent = "Preview error: " + (e && e.message ? e.message : String(e)); __el.appendChild(__p); }\n' +
+      '}';
+    return code + '\n' + renderBlock;
+  }
+
+  function updatePreviewCanvas(html, css, format, frameWidth, frameHeight) {
+    var wrap = document.getElementById('preview-canvas-wrap');
+    var iframe = document.getElementById('preview-iframe');
+    if (!wrap || !iframe) return;
+    wrap.classList.remove('has-content');
+    if (!html && !css) return;
+    wrap.classList.add('has-content');
+    previewFrameWidth = frameWidth > 0 ? frameWidth : 1;
+    previewFrameHeight = frameHeight > 0 ? frameHeight : 1;
+    previewZoomLevel = 1;
+    var scaleStyles =
+      'html,body{width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;overflow:hidden !important;background:#fff !important;position:relative !important;}' +
+      'body{box-sizing:border-box !important;}' +
+      '#preview-root{display:inline-block;position:absolute !important;left:50% !important;top:50% !important;transform:translate(-50%, -50%) scale({{SCALE}});transform-origin:center center;}';
+
+    if (format === 'react') {
+      var scriptContent = prepareReactScript(html);
+      var scalePlaceholder = '{{SCALE}}';
+      function writeReactIframe(initialScale) {
+        var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+        if (!doc) return;
+        var scaleCss = scaleStyles.replace(scalePlaceholder, initialScale);
+        doc.open();
+        var loadingHtml = '<div id="preview-loading" style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5;color:#666;font-family:sans-serif;font-size:13px;">Loading preview…</div>';
+        var fallbackScript =
+          '<script>setTimeout(function(){ var L=document.getElementById("preview-loading"); if(L){ L.style.background="#fff"; L.style.color="#c00"; L.style.fontSize="12px"; L.style.padding="16px"; L.style.textAlign="center"; L.textContent="Preview could not load. External scripts may be blocked (e.g. in Figma). Run the exported code in a local project to preview."; } }, 6000);<\/script>';
+        doc.write(
+          '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+          (css ? '<style>' + css.replace(/<\/style>/gi, '<\\/style>') + '</style>' : '') +
+          '<style>' + scaleCss + '</style></head><body>' +
+          loadingHtml +
+          '<div id="preview-root"></div>' +
+          '<script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>' +
+          '<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>' +
+          '<script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>' +
+          '<script type="text/babel" data-presets="react">' + scriptContent + '<\/script>' +
+          fallbackScript +
+          '</body></html>'
+        );
+        doc.close();
+        var label = document.getElementById('preview-zoom-label');
+        if (label) label.textContent = Math.round(initialScale * 100) + '%';
+      }
+      setTimeout(function() {
+        var size = getPreviewContainerSize();
+        previewFitScale = Math.min(size.w / previewFrameWidth, size.h / previewFrameHeight);
+        if (previewFitScale > 1) previewFitScale = 1;
+        var initialScale = previewFitScale * previewZoomLevel;
+        writeReactIframe(initialScale);
+      }, 0);
+      return;
+    }
+
+    function writeIframe(initialScale) {
+      var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+      if (!doc) return;
+      var scaleCss = scaleStyles.replace('{{SCALE}}', initialScale);
+      doc.open();
+      doc.write(
+        '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+        (css ? '<style>' + css + '</style>' : '') +
+        '<style>' + scaleCss + '</style></head><body>' +
+        '<div id="preview-root">' + (html || '') + '</div></body></html>'
+      );
+      doc.close();
+      var label = document.getElementById('preview-zoom-label');
+      if (label) label.textContent = Math.round(initialScale * 100) + '%';
+    }
+    setTimeout(function() {
+      var size = getPreviewContainerSize();
+      previewFitScale = Math.min(size.w / previewFrameWidth, size.h / previewFrameHeight);
+      if (previewFitScale > 1) previewFitScale = 1;
+      var initialScale = previewFitScale * previewZoomLevel;
+      writeIframe(initialScale);
+    }, 0);
   }
 
   function copyToClipboard(id) {
@@ -543,6 +814,15 @@
     btn.onclick = function() { copyToClipboard(btn.dataset.target); };
   });
 
+  document.getElementById('preview-zoom-in').onclick = function() {
+    previewZoomLevel = Math.min(3, previewZoomLevel * 1.25);
+    applyPreviewZoom();
+  };
+  document.getElementById('preview-zoom-out').onclick = function() {
+    previewZoomLevel = Math.max(0.25, previewZoomLevel / 1.25);
+    applyPreviewZoom();
+  };
+
   onmessage = function(event) {
     var msg = event.data && event.data.pluginMessage;
     if (!msg || !msg.type) return;
@@ -563,8 +843,16 @@
         });
       }
       var tabOutput = document.getElementById('tab-output');
-      if (tabOutput) tabOutput.textContent = exportFormat === 'react' ? 'JSX' : 'HTML';
+      var tabLabel = tabOutput && tabOutput.querySelector('.code-tab-label');
+      if (tabLabel) tabLabel.textContent = exportFormat === 'react' ? 'JSX' : 'HTML';
       setPreviewExpanded(true);
+      updatePreviewCanvas(
+        outputEl.value,
+        cssEl.value,
+        receivedFormat,
+        msg.frameWidth,
+        msg.frameHeight
+      );
       showToast('Export complete.', 'success');
       setTimeout(function() {
         var markupLang = exportFormat === 'react' ? 'jsx' : 'markup';
