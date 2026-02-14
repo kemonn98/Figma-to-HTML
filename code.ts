@@ -10,8 +10,12 @@ type ExportNode = { html: string };
 
 type OutputFormat = 'html' | 'react';
 
-const getClassAttr = (classes: string[], format: OutputFormat) =>
-  format === 'react' ? `className="${classes.join(' ')}"` : `class="${classes.join(' ')}"`;
+const getClassAttr = (classes: string[], format: OutputFormat) => {
+  const joined = classes.filter(Boolean).join(' ').trim();
+  if (!joined) return '';
+  const attr = format === 'react' ? `className="${joined}"` : `class="${joined}"`;
+  return attr + ' ';
+};
 
 const getStyleAttr = (styles: string[], format: OutputFormat) =>
   format === 'react' ? buildReactStyleAttr(styles) : buildInlineStyle(styles);
@@ -103,7 +107,7 @@ const roundAlpha = (a: number) => Math.round((a ?? 1) * 100) / 100;
 
 const getSolidFill = (node: GeometryMixin) => {
   if (!('fills' in node) || node.fills === figma.mixed) return null;
-  const fill = node.fills.find((paint) => paint.type === 'SOLID') as
+  const fill = node.fills.find((paint) => paint.type === 'SOLID' && paint.visible !== false) as
     | SolidPaint
     | undefined;
   if (!fill) return null;
@@ -116,7 +120,7 @@ const getSolidFill = (node: GeometryMixin) => {
 
 const getSolidTextFill = (text: TextNode) => {
   if (text.fills === figma.mixed) return null;
-  const fill = text.fills.find((paint) => paint.type === 'SOLID') as
+  const fill = text.fills.find((paint) => paint.type === 'SOLID' && paint.visible !== false) as
     | SolidPaint
     | undefined;
   if (!fill) return null;
@@ -128,7 +132,7 @@ const getSolidTextFill = (text: TextNode) => {
 };
 
 const getSolidFillFromPaints = (paints: ReadonlyArray<Paint>) => {
-  const fill = paints.find((paint) => paint.type === 'SOLID') as
+  const fill = paints.find((paint) => paint.type === 'SOLID' && paint.visible !== false) as
     | SolidPaint
     | undefined;
   if (!fill) return null;
@@ -176,7 +180,7 @@ const makeSvgIdsUnique = (svg: string, suffix: string): string => {
 
 const hasImageFill = (node: GeometryMixin) => {
   if (!('fills' in node) || node.fills === figma.mixed) return false;
-  return node.fills.some((paint) => paint.type === 'IMAGE');
+  return node.fills.some((paint) => paint.type === 'IMAGE' && paint.visible !== false);
 };
 
 const hasInvisibleStrokesOnly = (node: GeometryMixin): boolean => {
@@ -705,6 +709,94 @@ const isAbsoluteChild = (node: SceneNode, parentFrame: FrameNode | null) =>
   'layoutPositioning' in node &&
   node.layoutPositioning === 'ABSOLUTE';
 
+type ParentGroupLike = {
+  width: number;
+  height: number;
+  children: readonly SceneNode[];
+  absoluteBoundingBox?: { x: number; y: number } | null;
+};
+
+/** Position styles for children of a Group. Group children use explicit x,y (and optional constraints). */
+const getGroupChildPositionStyles = (
+  node: SceneNode,
+  parentGroup: ParentGroupLike
+): string[] => {
+  const styles: string[] = ['position: absolute'];
+  const zIndex = parentGroup.children.indexOf(node);
+  if (zIndex >= 0) styles.push(`z-index: ${zIndex}`);
+
+  // Use absoluteBoundingBox when available for correct parent-relative position
+  let left: number;
+  let top: number;
+  const parentBounds = parentGroup.absoluteBoundingBox;
+  const nodeBounds = node.absoluteBoundingBox;
+  if (parentBounds && nodeBounds) {
+    left = nodeBounds.x - parentBounds.x;
+    top = nodeBounds.y - parentBounds.y;
+  } else {
+    left = node.x;
+    top = node.y;
+  }
+  const rawLeft = left;
+  const rawTop = top;
+  const leftPx = roundPx(left);
+  const topPx = roundPx(top);
+  const right = roundPx(parentGroup.width - (rawLeft + node.width));
+  const bottom = roundPx(parentGroup.height - (rawTop + node.height));
+  const constraints =
+    'constraints' in node ? node.constraints : { horizontal: 'MIN', vertical: 'MIN' };
+  const transformParts: string[] = [];
+
+  switch (constraints.horizontal) {
+    case 'MAX':
+      styles.push(`right: ${right}px`);
+      break;
+    case 'CENTER': {
+      const centerX = rawLeft + node.width / 2;
+      const offsetX = roundPx(centerX - parentGroup.width / 2);
+      styles.push('left: 50%');
+      transformParts.push('translateX(-50%)');
+      if (Math.round(offsetX) !== 0) transformParts.push(`translateX(${offsetX}px)`);
+      break;
+    }
+    case 'STRETCH':
+      styles.push(`left: ${leftPx}px`, `right: ${right}px`);
+      break;
+    default:
+      styles.push(`left: ${leftPx}px`);
+      break;
+  }
+
+  switch (constraints.vertical) {
+    case 'MAX':
+      styles.push(`bottom: ${bottom}px`);
+      break;
+    case 'CENTER': {
+      const centerY = rawTop + node.height / 2;
+      const offsetY = roundPx(centerY - parentGroup.height / 2);
+      styles.push('top: 50%');
+      transformParts.push('translateY(-50%)');
+      if (Math.round(offsetY) !== 0) transformParts.push(`translateY(${offsetY}px)`);
+      break;
+    }
+    case 'STRETCH':
+      styles.push(`top: ${topPx}px`, `bottom: ${bottom}px`);
+      break;
+    default:
+      styles.push(`top: ${topPx}px`);
+      break;
+  }
+
+  const rot = 'rotation' in node ? (node as { rotation: number }).rotation : 0;
+  if (isMeaningfulRotation(rot)) {
+    transformParts.push(`rotate(${roundPx(rot)}deg)`);
+  }
+  if (transformParts.length > 0) {
+    styles.push(`transform: ${transformParts.join(' ')}`);
+  }
+  return styles;
+};
+
 const getAbsolutePositionStyles = (
   node: SceneNode,
   parentFrame: FrameNode | null
@@ -803,7 +895,7 @@ const buildInlineStyle = (styles: string[]) => {
     }
   }
   const deduped = Array.from(seen.values());
-  return ` style="${deduped.join('; ')};"`;
+  return `style="${deduped.join('; ')}"`;
 };
 
 const buildReactStyleAttr = (styles: string[]) => {
@@ -850,10 +942,15 @@ const nodeToHtmlCss = async (
   context: ExportContext,
   parentLayoutMode: FrameNode['layoutMode'] | null = null,
   parentFrame: FrameNode | null = null,
+  parentGroup: GroupNode | FrameNode | null = null,
   outputFormat: OutputFormat = 'html',
   indent: number = 0,
   baseIndent: number = 0
 ): Promise<ExportNode> => {
+  if (node.visible === false) {
+    return { html: '' };
+  }
+
   // Pretty-print for both HTML and React. HTML uses baseIndent=2 so body content aligns under <body>; React uses 0 and wrapper adds 4 spaces.
   const openPrefix = (indent === 0 && baseIndent === 0 ? '' : '\n') + '  '.repeat(baseIndent + indent);
   const closePrefix = '\n' + '  '.repeat(baseIndent + indent);
@@ -862,7 +959,7 @@ const nodeToHtmlCss = async (
   let className = baseName;
   let html = '';
 
-  if (node.type === 'FRAME') {
+  if (node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE') {
     const frame = node as FrameNode;
     const isInvisibleSpacer =
       frame.height < 1 &&
@@ -883,15 +980,22 @@ const nodeToHtmlCss = async (
     const styleLines: string[] = [];
     const fill = getSolidFill(frame);
     const inlineStyles = [...sizing.styles];
-    const absoluteStyles = getAbsolutePositionStyles(frame, parentFrame);
-    inlineStyles.push(...absoluteStyles);
-    if (!isAbsoluteChild(frame, parentFrame) && parentFrame) {
-      inlineStyles.push('position: relative');
-      const idx = parentFrame.children.indexOf(frame);
-      const z = parentFrame.itemReverseZIndex
-        ? parentFrame.children.length - 1 - idx
-        : 1;
-      inlineStyles.push(`z-index: ${z}`);
+    let hasPositioningTransform = false;
+    if (parentGroup) {
+      inlineStyles.push(...getGroupChildPositionStyles(frame, parentGroup));
+      hasPositioningTransform = true;
+    } else {
+      const absoluteStyles = getAbsolutePositionStyles(frame, parentFrame);
+      inlineStyles.push(...absoluteStyles);
+      hasPositioningTransform = absoluteStyles.length > 0;
+      if (!isAbsoluteChild(frame, parentFrame) && parentFrame) {
+        inlineStyles.push('position: relative');
+        const idx = parentFrame.children.indexOf(frame);
+        const z = parentFrame.itemReverseZIndex
+          ? parentFrame.children.length - 1 - idx
+          : 1;
+        inlineStyles.push(`z-index: ${z}`);
+      }
     }
     if (fill) inlineStyles.push(`background: ${fill}`);
     if (!fill && hasImageFill(frame)) inlineStyles.push('background: #e5e7eb');
@@ -905,7 +1009,7 @@ const nodeToHtmlCss = async (
     if (frame.clipsContent) inlineStyles.push('overflow: hidden');
     // Figma frame dimensions include padding; use border-box so width/height match
     if (frame.layoutMode !== 'NONE') inlineStyles.push('box-sizing: border-box');
-    if (isMeaningfulRotation(frame.rotation) && absoluteStyles.length === 0) {
+    if (isMeaningfulRotation(frame.rotation) && !hasPositioningTransform) {
       inlineStyles.push(`transform: rotate(${roundPx(frame.rotation)}deg)`);
     }
     if (styleLines.length > 0) {
@@ -920,11 +1024,12 @@ const nodeToHtmlCss = async (
       classes.push(baseName);
     }
     if (
-      frame.layoutMode !== 'NONE' &&
-      frame.children.some(
-        (child) =>
-          'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE'
-      )
+      frame.layoutMode === 'NONE'
+        ? frame.children.length > 0
+        : frame.children.some(
+            (child) =>
+              'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE'
+          )
     ) {
       inlineStyles.push('position: relative');
     }
@@ -944,12 +1049,103 @@ const nodeToHtmlCss = async (
       frame.layoutMode === 'NONE' ? null : frame.layoutMode;
     const childParentFrame =
       frame.layoutMode === 'NONE' ? null : frame;
-    for (const child of frame.children) {
+    const childParentGroup =
+      frame.layoutMode === 'NONE' ? frame : null;
+    const frameChildren = Array.from(frame.children);
+    for (const child of frameChildren) {
       const childExport = await nodeToHtmlCss(
         child,
         context,
         childParentLayoutMode,
         childParentFrame,
+        childParentGroup,
+        outputFormat,
+        indent + 1,
+        baseIndent
+      );
+      html += childExport.html;
+    }
+
+    html += closePrefix + `</div>`;
+  }
+
+  if (node.type === 'GROUP' || node.type === 'TRANSFORM_GROUP') {
+    const group = node as GroupNode;
+    const isInvisibleSpacer =
+      group.height < 1 &&
+      roundPx(group.opacity) < 0.01 &&
+      group.children.length === 0;
+    if (isInvisibleSpacer) {
+      return { html: '' };
+    }
+    const classes: string[] = [];
+    const inlineStyles: string[] = [];
+    inlineStyles.push(
+      `width: ${roundDim(group.width)}px`,
+      `height: ${roundDim(group.height)}px`
+    );
+    if (parentGroup) {
+      inlineStyles.push(...getGroupChildPositionStyles(group, parentGroup));
+    } else if (parentFrame) {
+      if ('layoutPositioning' in group && group.layoutPositioning === 'ABSOLUTE') {
+        inlineStyles.push(...getAbsolutePositionStyles(group, parentFrame));
+      } else {
+        inlineStyles.push('position: relative');
+        const idx = parentFrame.children.indexOf(group);
+        const z = parentFrame.itemReverseZIndex
+          ? parentFrame.children.length - 1 - idx
+          : idx + 1;
+        inlineStyles.push(`z-index: ${z}`);
+      }
+    } else {
+      inlineStyles.push('position: relative');
+    }
+    if ('fills' in group && group.fills !== figma.mixed) {
+      const fill = getSolidFill(group as unknown as GeometryMixin);
+      if (fill) inlineStyles.push(`background: ${fill}`);
+      else if (hasImageFill(group as unknown as GeometryMixin)) inlineStyles.push('background: #e5e7eb');
+    }
+    if ('strokes' in group && Array.isArray((group as { strokes?: unknown }).strokes)) {
+      inlineStyles.push(...getStrokeStyles(group as unknown as GeometryMixin));
+    }
+    if ('cornerRadius' in group && (group as SceneNode & { cornerRadius?: unknown }).cornerRadius !== figma.mixed) {
+      const radius = getCornerRadiusStyle(group as SceneNode);
+      if (radius) inlineStyles.push(radius);
+    }
+    if ('effects' in group && (group as BlendMixin).effects?.length) {
+      inlineStyles.push(...getEffectsStyles(group as BlendMixin));
+    }
+    if (group.opacity < 1) inlineStyles.push(`opacity: ${roundPx(group.opacity)}`);
+    const groupBlend = 'blendMode' in group ? mapBlendMode(group.blendMode) : null;
+    if (groupBlend && groupBlend !== 'normal') inlineStyles.push(`mix-blend-mode: ${groupBlend}`);
+    if (isMeaningfulRotation(group.rotation)) {
+      inlineStyles.push(`transform: rotate(${roundPx(group.rotation)}deg)`);
+    }
+
+    if (classes.length === 0) {
+      context.usedBaseClasses.add(baseName);
+      registerUtilityClass('group', ['  display: block;'], context);
+      classes.push('group', baseName);
+    } else {
+      classes.unshift(baseName);
+    }
+    const seen = new Set<string>();
+    const finalClasses = classes.filter((c) => {
+      if (seen.has(c)) return false;
+      seen.add(c);
+      return true;
+    });
+    inlineStyles.push('overflow: visible');
+    html += openPrefix + `<div ${getClassAttr(finalClasses, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>`;
+
+    for (const child of group.children) {
+      if (!('type' in child)) continue;
+      const childExport = await nodeToHtmlCss(
+        child as SceneNode,
+        context,
+        null,
+        null,
+        group,
         outputFormat,
         indent + 1,
         baseIndent
@@ -1045,14 +1241,18 @@ const nodeToHtmlCss = async (
     const sizing = registerSizingUtilities(text, parentLayoutMode, context);
     classes.push(...sizing.classes);
     inlineStyles.push(...sizing.styles);
-    inlineStyles.push(...getAbsolutePositionStyles(text, parentFrame));
-    if (!isAbsoluteChild(text, parentFrame) && parentFrame) {
-      inlineStyles.push('position: relative');
-      const idx = parentFrame.children.indexOf(text);
-      const z = parentFrame.itemReverseZIndex
-        ? parentFrame.children.length - 1 - idx
-        : 1;
-      inlineStyles.push(`z-index: ${z}`);
+    if (parentGroup) {
+      inlineStyles.push(...getGroupChildPositionStyles(text, parentGroup));
+    } else {
+      inlineStyles.push(...getAbsolutePositionStyles(text, parentFrame));
+      if (!isAbsoluteChild(text, parentFrame) && parentFrame) {
+        inlineStyles.push('position: relative');
+        const idx = parentFrame.children.indexOf(text);
+        const z = parentFrame.itemReverseZIndex
+          ? parentFrame.children.length - 1 - idx
+          : 1;
+        inlineStyles.push(`z-index: ${z}`);
+      }
     }
     const escapeText = outputFormat === 'react' ? escapeJsxText : escapeHtml;
     let textContent = escapeText(text.characters);
@@ -1112,14 +1312,18 @@ const nodeToHtmlCss = async (
     const sizing = registerSizingUtilities(rect, parentLayoutMode, context);
     classes.push(...sizing.classes);
     const inlineStyles = [...sizing.styles];
-    inlineStyles.push(...getAbsolutePositionStyles(rect, parentFrame));
-    if (!isAbsoluteChild(rect, parentFrame) && parentFrame) {
-      inlineStyles.push('position: relative');
-      const idx = parentFrame.children.indexOf(rect);
-      const z = parentFrame.itemReverseZIndex
-        ? parentFrame.children.length - 1 - idx
-        : 1;
-      inlineStyles.push(`z-index: ${z}`);
+    if (parentGroup) {
+      inlineStyles.push(...getGroupChildPositionStyles(rect, parentGroup));
+    } else {
+      inlineStyles.push(...getAbsolutePositionStyles(rect, parentFrame));
+      if (!isAbsoluteChild(rect, parentFrame) && parentFrame) {
+        inlineStyles.push('position: relative');
+        const idx = parentFrame.children.indexOf(rect);
+        const z = parentFrame.itemReverseZIndex
+          ? parentFrame.children.length - 1 - idx
+          : 1;
+        inlineStyles.push(`z-index: ${z}`);
+      }
     }
     if (fill) inlineStyles.push(`background: ${fill}`);
     if (!fill && hasImageFill(rect)) inlineStyles.push('background: #e5e7eb');
@@ -1141,14 +1345,18 @@ const nodeToHtmlCss = async (
     const sizing = registerSizingUtilities(node, parentLayoutMode, context);
     classes.push(...sizing.classes);
     const inlineStyles = [...sizing.styles];
-    inlineStyles.push(...getAbsolutePositionStyles(node, parentFrame));
-    if (!isAbsoluteChild(node, parentFrame) && parentFrame) {
-      inlineStyles.push('position: relative');
-      const idx = parentFrame.children.indexOf(node);
-      const z = parentFrame.itemReverseZIndex
-        ? parentFrame.children.length - 1 - idx
-        : 1;
-      inlineStyles.push(`z-index: ${z}`);
+    if (parentGroup) {
+      inlineStyles.push(...getGroupChildPositionStyles(node, parentGroup));
+    } else {
+      inlineStyles.push(...getAbsolutePositionStyles(node, parentFrame));
+      if (!isAbsoluteChild(node, parentFrame) && parentFrame) {
+        inlineStyles.push('position: relative');
+        const idx = parentFrame.children.indexOf(node);
+        const z = parentFrame.itemReverseZIndex
+          ? parentFrame.children.length - 1 - idx
+          : 1;
+        inlineStyles.push(`z-index: ${z}`);
+      }
     }
     inlineStyles.push(...getEffectsStyles(node as BlendMixin));
     const vecBlend = 'blendMode' in node ? mapBlendMode(node.blendMode) : null;
@@ -1162,7 +1370,11 @@ const nodeToHtmlCss = async (
       if (!inlineStyles.some((s) => s.startsWith('width:') || s.startsWith('height:'))) {
         inlineStyles.push(`width: ${Math.round(node.width)}px`, `height: ${Math.round(node.height)}px`);
       }
-      inlineStyles.push('background: #e5e7eb');
+      const vecFill = getSolidFill(node as GeometryMixin);
+      if (vecFill) inlineStyles.push(`background: ${vecFill}`);
+      else if (hasImageFill(node as GeometryMixin)) inlineStyles.push('background: #e5e7eb');
+      else inlineStyles.push('background: #e5e7eb');
+      inlineStyles.push(...getStrokeStyles(node as GeometryMixin));
       if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
       html += openPrefix + `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
     } else {
@@ -1182,7 +1394,11 @@ const nodeToHtmlCss = async (
         if (!inlineStyles.some((s) => s.startsWith('width:') || s.startsWith('height:'))) {
           inlineStyles.push(`width: ${roundDim(node.width)}px`, `height: ${roundDim(node.height)}px`);
         }
-        inlineStyles.push('background: #e5e7eb');
+        const vecFill = getSolidFill(node as GeometryMixin);
+        if (vecFill) inlineStyles.push(`background: ${vecFill}`);
+        else if (hasImageFill(node as GeometryMixin)) inlineStyles.push('background: #e5e7eb');
+        else inlineStyles.push('background: #e5e7eb');
+        inlineStyles.push(...getStrokeStyles(node as GeometryMixin));
         if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
         html += openPrefix + `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
       }
@@ -1193,15 +1409,13 @@ const nodeToHtmlCss = async (
 };
 
 const exportSelection = async (format: 'html' | 'react' = 'html'): Promise<ExportResult> => {
+  await figma.currentPage.loadAsync();
   const selection = figma.currentPage.selection[0];
-  if (!selection || selection.type !== 'FRAME') {
-    throw new Error('Select a frame with auto-layout.');
+  const allowedTypes = ['FRAME', 'GROUP', 'TRANSFORM_GROUP', 'COMPONENT', 'INSTANCE'];
+  if (!selection || allowedTypes.indexOf(selection.type) === -1) {
+    throw new Error('Select a frame, component, instance, or group.');
   }
-
-  const frame = selection as FrameNode;
-  if (frame.layoutMode === 'NONE') {
-    throw new Error('Selected frame must use auto-layout.');
-  }
+  const rootNode = selection as SceneNode;
 
   const context: ExportContext = {
     nameCounts: new Map<string, number>(),
@@ -1215,7 +1429,7 @@ const exportSelection = async (format: 'html' | 'react' = 'html'): Promise<Expor
 
   const outputFormat: OutputFormat = format;
   const baseIndent = format === 'html' ? 2 : 0; // HTML body content indented 2 spaces; React uses 0 and wrapper adds 4
-  const { html: bodyContent } = await nodeToHtmlCss(frame, context, null, null, outputFormat, 0, baseIndent);
+  const { html: bodyContent } = await nodeToHtmlCss(rootNode, context, null, null, null, outputFormat, 0, baseIndent);
   const googleFonts = Array.from(context.fontFamiliesUsed)
     .filter((f) => !/font awesome|awesome/i.test(f))
     .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@400;500;600;700`)
@@ -1234,10 +1448,13 @@ const exportSelection = async (format: 'html' | 'react' = 'html'): Promise<Expor
     .map((entry) => entry.cssText)
     .join('');
 
+  const frameWidth = rootNode.width;
+  const frameHeight = rootNode.height;
+
   if (format === 'react') {
     const indented = '    ' + bodyContent.replace(/\n/g, '\n    ');
     const jsx = `import './styles.css';\n\nexport default function ExportedComponent() {\n  return (\n${indented}\n  );\n}\n`;
-    return { format: 'react', jsx, css, frameWidth: frame.width, frameHeight: frame.height };
+    return { format: 'react', jsx, css, frameWidth, frameHeight };
   }
 
   const fontsLink =
@@ -1259,7 +1476,7 @@ ${fontsLink}    <link rel="stylesheet" href="styles.css">
 ${bodyContent}
   </body>
 </html>`;
-  return { format: 'html', html, css, frameWidth: frame.width, frameHeight: frame.height };
+  return { format: 'html', html, css, frameWidth, frameHeight };
 };
 
 figma.ui.onmessage = (msg: ExportMessage) => {
