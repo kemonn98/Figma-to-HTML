@@ -46,6 +46,37 @@ const sanitizeName = (name: string) =>
     .replace(/\s+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+/** PascalCase class name from layer name, e.g. "Frame 2095585183" → "Frame2095585183" */
+const toPascalCase = (name: string) => {
+  const parts = name.trim().split(/[^a-zA-Z0-9]+/).filter(Boolean);
+  return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('');
+};
+
+const getDataLayerAttr = (name: string, format: OutputFormat) => {
+  const escaped = name.replace(/"/g, '&quot;');
+  return format === 'react' ? `data-layer="${escaped}" ` : `data-layer="${escaped}" `;
+};
+
+const getLayerBlurRadius = (node: BlendMixin): number => {
+  if (!('effects' in node) || !node.effects.length) return 0;
+  const blur = node.effects.find((e) => e.type === 'LAYER_BLUR' && e.visible !== false);
+  return blur && blur.type === 'LAYER_BLUR' ? blur.radius : 0;
+};
+
+/** True if this node or any descendant has a visible layer blur (so we should not clip with overflow: hidden). */
+const hasDescendantWithLayerBlur = (node: SceneNode): boolean => {
+  if ('effects' in node && Array.isArray(node.effects)) {
+    const hasBlur = node.effects.some((e) => e.type === 'LAYER_BLUR' && e.visible !== false);
+    if (hasBlur) return true;
+  }
+  if ('children' in node && node.children) {
+    for (const child of node.children) {
+      if (hasDescendantWithLayerBlur(child)) return true;
+    }
+  }
+  return false;
+};
+
 const escapeHtml = (text: string) =>
   text.replace(/[&<>"']/g, (match) => {
     const table: Record<string, string> = {
@@ -105,6 +136,19 @@ const mapCounterAxis = (val: FrameNode['counterAxisAlignItems']) => {
 
 const roundAlpha = (a: number) => Math.round((a ?? 1) * 100) / 100;
 
+/** Solid color as CSS: hex when opaque, rgba when not. */
+const toCssColor = (r: number, g: number, b: number, a: number): string => {
+  const R = Math.round(r * 255);
+  const G = Math.round(g * 255);
+  const B = Math.round(b * 255);
+  const alpha = roundAlpha(a);
+  if (alpha >= 1 || Math.abs(alpha - 1) < 0.005) {
+    const hex = (x: number) => ('0' + x.toString(16)).slice(-2);
+    return '#' + (hex(R) + hex(G) + hex(B)).toUpperCase();
+  }
+  return `rgba(${R}, ${G}, ${B}, ${alpha})`;
+};
+
 const getSolidFill = (node: GeometryMixin) => {
   if (!('fills' in node) || node.fills === figma.mixed) return null;
   const fill = node.fills.find((paint) => paint.type === 'SOLID' && paint.visible !== false) as
@@ -112,10 +156,8 @@ const getSolidFill = (node: GeometryMixin) => {
     | undefined;
   if (!fill) return null;
   const { r, g, b } = fill.color;
-  const a = roundAlpha(fill.opacity ?? 1);
-  return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(
-    b * 255
-  )}, ${a})`;
+  const a = fill.opacity ?? 1;
+  return toCssColor(r, g, b, a);
 };
 
 const getSolidTextFill = (text: TextNode) => {
@@ -125,10 +167,8 @@ const getSolidTextFill = (text: TextNode) => {
     | undefined;
   if (!fill) return null;
   const { r, g, b } = fill.color;
-  const a = roundAlpha(fill.opacity ?? 1);
-  return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(
-    b * 255
-  )}, ${a})`;
+  const a = fill.opacity ?? 1;
+  return toCssColor(r, g, b, a);
 };
 
 const getSolidFillFromPaints = (paints: ReadonlyArray<Paint>) => {
@@ -137,10 +177,133 @@ const getSolidFillFromPaints = (paints: ReadonlyArray<Paint>) => {
     | undefined;
   if (!fill) return null;
   const { r, g, b } = fill.color;
-  const a = roundAlpha(fill.opacity ?? 1);
-  return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(
-    b * 255
-  )}, ${a})`;
+  const a = fill.opacity ?? 1;
+  return toCssColor(r, g, b, a);
+};
+
+/** Figma gradient paint (plugin API uses gradientTransform + gradientStops). */
+type FigmaGradientPaint = {
+  type: 'GRADIENT_LINEAR' | 'GRADIENT_RADIAL' | 'GRADIENT_ANGULAR' | 'GRADIENT_DIAMOND';
+  gradientTransform: Transform;
+  gradientStops: ReadonlyArray<{ position: number; color: RGBA }>;
+  visible?: boolean;
+  opacity?: number;
+};
+
+/** Transform is 2x3: [[a, b, tx], [c, d, ty]]. Maps (x,y) -> (a*x+b*y+tx, c*x+d*y+ty). */
+const gradientStopsToCss = (stops: ReadonlyArray<{ position: number; color: RGBA }>): string => {
+  if (!stops.length) return '';
+  const parts = stops.map((s) => {
+    const c = s.color;
+    const a = 'a' in c ? c.a : 1;
+    const color = toCssColor(c.r, c.g, c.b, a);
+    const pct = Math.round(s.position * 100);
+    return `${color} ${pct}%`;
+  });
+  return parts.join(', ');
+};
+
+/** Linear: transform gives start (tx,ty) and direction (a,c). CSS angle: 0deg=to top, 90deg=to right. Flip +180 to match Figma. */
+const gradientTransformToLinearCss = (t: Transform): string => {
+  const a = t[0][0];
+  const c = t[1][0];
+  const angleDeg = Math.round((Math.atan2(a, -c) * 180) / Math.PI) + 180;
+  const normalized = ((angleDeg % 360) + 360) % 360;
+  return `${normalized}deg`;
+};
+
+/** Radial: transform maps gradient space to layer. Use center (tx,ty) and scale for size. */
+const gradientTransformToRadialCss = (t: Transform): string => {
+  const tx = t[0][2];
+  const ty = t[1][2];
+  const a = t[0][0];
+  const d = t[1][1];
+  const scaleX = Math.sqrt(t[0][0] * t[0][0] + t[1][0] * t[1][0]);
+  const scaleY = Math.sqrt(t[0][1] * t[0][1] + t[1][1] * t[1][1]);
+  const cx = Math.round(tx * 100);
+  const cy = Math.round(ty * 100);
+  const rx = Math.round(scaleX * 100);
+  const ry = Math.round(scaleY * 100);
+  if (Math.abs(rx - ry) < 5) return `circle ${rx}% at ${cx}% ${cy}%`;
+  return `ellipse ${rx}% ${ry}% at ${cx}% ${cy}%`;
+};
+
+/** Angular (conic): center from translation, start angle from rotation. Flip +180 to match Figma. */
+const gradientTransformToConicCss = (t: Transform): string => {
+  const tx = t[0][2];
+  const ty = t[1][2];
+  const a = t[0][0];
+  const c = t[1][0];
+  const fromAngle = Math.round((Math.atan2(-c, a) * 180) / Math.PI) + 180;
+  const normalized = ((fromAngle % 360) + 360) % 360;
+  const cx = Math.round(tx * 100);
+  const cy = Math.round(ty * 100);
+  return `from ${normalized}deg at ${cx}% ${cy}%`;
+};
+
+const paintToCssBackground = (paint: SolidPaint | FigmaGradientPaint): string => {
+  if (paint.type === 'SOLID') {
+    const p = paint as SolidPaint;
+    return toCssColor(p.color.r, p.color.g, p.color.b, p.opacity ?? 1);
+  }
+  const g = paint as FigmaGradientPaint;
+  if (g.visible === false) return '';
+  const stops = gradientStopsToCss(g.gradientStops);
+  if (!stops) return '';
+  const t = g.gradientTransform;
+  switch (g.type) {
+    case 'GRADIENT_LINEAR': {
+      const angle = gradientTransformToLinearCss(t);
+      return `linear-gradient(${angle}, ${stops})`;
+    }
+    case 'GRADIENT_RADIAL': {
+      const shape = gradientTransformToRadialCss(t);
+      return `radial-gradient(${shape}, ${stops})`;
+    }
+    case 'GRADIENT_ANGULAR': {
+      const from = gradientTransformToConicCss(t);
+      return `conic-gradient(${from}, ${stops})`;
+    }
+    case 'GRADIENT_DIAMOND': {
+      const shape = gradientTransformToRadialCss(t);
+      return `radial-gradient(${shape}, ${stops})`;
+    }
+    default:
+      return '';
+  }
+};
+
+/** First visible fill as CSS background: solid or gradient. */
+const getFillStyle = (node: GeometryMixin): string | null => {
+  if (!('fills' in node) || node.fills === figma.mixed) return null;
+  const fill = node.fills.find((p) => p.visible !== false) as SolidPaint | FigmaGradientPaint | undefined;
+  if (!fill) return null;
+  if (fill.type === 'SOLID') return paintToCssBackground(fill as SolidPaint);
+  if (
+    fill.type === 'GRADIENT_LINEAR' ||
+    fill.type === 'GRADIENT_RADIAL' ||
+    fill.type === 'GRADIENT_ANGULAR' ||
+    fill.type === 'GRADIENT_DIAMOND'
+  ) {
+    return paintToCssBackground(fill as FigmaGradientPaint);
+  }
+  return null;
+};
+
+/** First visible fill from paints array (e.g. text segment). */
+const getFillStyleFromPaints = (paints: ReadonlyArray<Paint>): string | null => {
+  const fill = paints.find((p) => p.visible !== false) as SolidPaint | FigmaGradientPaint | undefined;
+  if (!fill) return null;
+  if (fill.type === 'SOLID') return paintToCssBackground(fill as SolidPaint);
+  if (
+    fill.type === 'GRADIENT_LINEAR' ||
+    fill.type === 'GRADIENT_RADIAL' ||
+    fill.type === 'GRADIENT_ANGULAR' ||
+    fill.type === 'GRADIENT_DIAMOND'
+  ) {
+    return paintToCssBackground(fill as FigmaGradientPaint);
+  }
+  return null;
 };
 
 const isVectorNode = (node: SceneNode) =>
@@ -176,6 +339,24 @@ const makeSvgIdsUnique = (svg: string, suffix: string): string => {
     result = result.split(`url(#${id})`).join(`url(#${newId})`);
   }
   return result;
+};
+
+/** Force root SVG to node size so masked/full shape exports use correct dimensions (not half/tight bounds). Only replaces width, height, viewBox — no scale transform. Fixes circles missing cx/cy (Figma export sometimes omits them; default would be 0 and misplace the circle). */
+const normalizeSvgToNodeSize = (svg: string, width: number, height: number): string => {
+  const w = roundDim(width);
+  const h = roundDim(height);
+  let out = svg.replace(/\bwidth=["'][^"']*["']/i, `width="${w}"`);
+  out = out.replace(/\bheight=["'][^"']*["']/i, `height="${h}"`);
+  if (/\bviewBox\s*=/i.test(out)) {
+    out = out.replace(/\bviewBox\s*=\s*["'][^"']*["']/i, `viewBox="0 0 ${w} ${h}"`);
+  } else {
+    out = out.replace(/<svg\s/i, `<svg viewBox="0 0 ${w} ${h}" `);
+  }
+  const cxCenter = roundDim(w / 2);
+  const cyCenter = roundDim(h / 2);
+  out = out.replace(/<circle(\s)(?![^>]*\bcx\s=)/i, `<circle cx="${cxCenter}"$1`);
+  out = out.replace(/<circle(\s)(?![^>]*\bcy\s=)/i, `<circle cy="${cyCenter}"$1`);
+  return out;
 };
 
 const hasImageFill = (node: GeometryMixin) => {
@@ -262,12 +443,127 @@ const formatNegativeClassValue = (value: number) => {
 };
 
 const roundPx = (n: number) => Math.round(n * 100) / 100;
+/** Higher precision for rotated shapes so non-90° angles don't drift from rounding. */
+const roundPx4 = (n: number) => Math.round(n * 10000) / 10000;
 const roundDim = (n: number) => Math.round(n);
 const isMeaningfulRotation = (r: number) => Math.abs(r) >= 0.01;
+/** Figma rotation in degrees; negate for correct CSS visual. */
+const cssRotationDeg = (rotation: number) => roundPx(-rotation);
 
 const getCornerRadiusStyle = (node: SceneNode) => {
-  if ('cornerRadius' in node && node.cornerRadius !== figma.mixed && typeof node.cornerRadius === 'number') {
+  if ('cornerRadius' in node && node.cornerRadius !== figma.mixed && typeof node.cornerRadius === 'number' && node.cornerRadius > 0) {
     return `border-radius: ${roundDim(node.cornerRadius)}px`;
+  }
+  return null;
+};
+
+/** Figma mask: a node with isMask=true masks all of its subsequent siblings. */
+const isMaskNode = (node: SceneNode): boolean =>
+  'isMask' in node && (node as { isMask?: boolean }).isMask === true;
+
+type FigmaMaskType = 'ALPHA' | 'VECTOR' | 'LUMINANCE';
+const getMaskType = (node: SceneNode): FigmaMaskType | null =>
+  ('maskType' in node && typeof (node as { maskType?: FigmaMaskType }).maskType === 'string')
+    ? (node as { maskType: FigmaMaskType }).maskType
+    : null;
+
+/** Gradient stops as CSS for use in mask-image. LUMINANCE: use luminance as mask alpha (black=0, white=1); ALPHA/default: use rgba as-is. */
+const gradientStopsToCssForMask = (
+  stops: ReadonlyArray<{ position: number; color: RGBA }>,
+  maskType: FigmaMaskType | null
+): string => {
+  if (!stops.length) return '';
+  const luminance = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
+  const parts = stops.map((s) => {
+    const c = s.color;
+    const a = 'a' in c ? c.a : 1;
+    const pct = Math.round(s.position * 100);
+    if (maskType === 'LUMINANCE') {
+      const lum = luminance(c.r, c.g, c.b) * a;
+      const maskAlpha = roundPx(lum);
+      const color = toCssColor(0, 0, 0, maskAlpha);
+      return `${color} ${pct}%`;
+    }
+    const color = toCssColor(c.r, c.g, c.b, a);
+    return `${color} ${pct}%`;
+  });
+  return parts.join(', ');
+};
+
+/** CSS gradient string for mask-image when the mask node has a gradient fill (linear/radial/conic). Returns null for solid or no fill. */
+const getMaskImageFromMaskNode = (node: SceneNode): string | null => {
+  if (!('fills' in node) || node.fills === figma.mixed || !node.fills.length) return null;
+  const fill = node.fills.find((p) => p.visible !== false) as SolidPaint | FigmaGradientPaint | undefined;
+  if (!fill || fill.type === 'SOLID') return null;
+  const g = fill as FigmaGradientPaint;
+  const maskType = getMaskType(node);
+  const stops = gradientStopsToCssForMask(g.gradientStops, maskType);
+  if (!stops) return null;
+  const t = g.gradientTransform;
+  switch (g.type) {
+    case 'GRADIENT_LINEAR': {
+      const angle = gradientTransformToLinearCss(t);
+      return `linear-gradient(${angle}, ${stops})`;
+    }
+    case 'GRADIENT_RADIAL': {
+      const shape = gradientTransformToRadialCss(t);
+      return `radial-gradient(${shape}, ${stops})`;
+    }
+    case 'GRADIENT_ANGULAR': {
+      const from = gradientTransformToConicCss(t);
+      return `conic-gradient(${from}, ${stops})`;
+    }
+    case 'GRADIENT_DIAMOND': {
+      const shape = gradientTransformToRadialCss(t);
+      return `radial-gradient(${shape}, ${stops})`;
+    }
+    default:
+      return null;
+  }
+};
+
+/** Style lines for CSS mask-image when the mask node has a gradient fill (for gradient masking). */
+const getMaskImageStyles = (maskNode: SceneNode): string[] => {
+  const maskImage = getMaskImageFromMaskNode(maskNode);
+  if (!maskImage) return [];
+  return [
+    `mask-image: ${maskImage}`,
+    `-webkit-mask-image: ${maskImage}`,
+    'mask-size: 100% 100%',
+    'mask-position: 0 0',
+    'mask-repeat: no-repeat',
+    '-webkit-mask-size: 100% 100%',
+    '-webkit-mask-position: 0 0',
+    '-webkit-mask-repeat: no-repeat',
+  ];
+};
+
+/** CSS clip-path for a mask node (in local coordinates, so wrapper must match node size). Returns null for unsupported shapes. */
+const getClipPathFromMaskNode = (node: SceneNode): string | null => {
+  if (node.type === 'RECTANGLE') {
+    const rect = node as RectangleNode;
+    const r = rect.cornerRadius;
+    if (r !== figma.mixed && typeof r === 'number' && r > 0) {
+      return `inset(0 round ${roundDim(r)}px)`;
+    }
+    if (r === figma.mixed && 'topLeftRadius' in rect) {
+      const tl = roundDim((rect as { topLeftRadius?: number }).topLeftRadius ?? 0);
+      const tr = roundDim((rect as { topRightRadius?: number }).topRightRadius ?? 0);
+      const br = roundDim((rect as { bottomRightRadius?: number }).bottomRightRadius ?? 0);
+      const bl = roundDim((rect as { bottomLeftRadius?: number }).bottomLeftRadius ?? 0);
+      if (tl || tr || br || bl) return `inset(0 round ${tl}px ${tr}px ${br}px ${bl}px)`;
+    }
+    return 'inset(0)';
+  }
+  if (node.type === 'ELLIPSE') {
+    return 'ellipse(50% 50% at 50% 50%)';
+  }
+  if (node.type === 'FRAME' || node.type === 'GROUP' || node.type === 'COMPONENT' || node.type === 'INSTANCE') {
+    const n = node as { cornerRadius?: number | symbol };
+    if (n.cornerRadius !== figma.mixed && typeof n.cornerRadius === 'number' && n.cornerRadius > 0) {
+      return `inset(0 round ${roundDim(n.cornerRadius)}px)`;
+    }
+    return 'inset(0)';
   }
   return null;
 };
@@ -282,8 +578,8 @@ const getStrokeStyles = (node: GeometryMixin): string[] => {
     ? (node as { strokeAlign: string }).strokeAlign
     : 'INSIDE';
   const { r, g, b } = stroke.color;
-  const a = Math.round((stroke.opacity ?? 1) * 100) / 100;
-  const color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+  const a = stroke.opacity ?? 1;
+  const color = toCssColor(r, g, b, a);
   if (align === 'INSIDE') {
     styles.push(`box-shadow: inset 0 0 0 ${w}px ${color}`);
   } else if (align === 'OUTSIDE') {
@@ -304,14 +600,14 @@ const getEffectsStyles = (node: BlendMixin): string[] => {
     if (e.visible === false) continue;
     if (e.type === 'DROP_SHADOW') {
       const { r, g, b } = e.color;
-      const a = roundAlpha('a' in e.color ? e.color.a : 1);
-      const color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+      const a = 'a' in e.color ? e.color.a : 1;
+      const color = toCssColor(r, g, b, a);
       const spread = roundDim('spread' in e ? e.spread || 0 : 0);
       shadows.push(`${roundDim(e.offset.x)}px ${roundDim(e.offset.y)}px ${roundDim(e.radius)}px ${spread}px ${color}`);
     } else if (e.type === 'INNER_SHADOW') {
       const { r, g, b } = e.color;
-      const a = roundAlpha('a' in e.color ? e.color.a : 1);
-      const color = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a})`;
+      const a = 'a' in e.color ? e.color.a : 1;
+      const color = toCssColor(r, g, b, a);
       const spread = roundDim('spread' in e ? e.spread || 0 : 0);
       shadows.push(`inset ${roundDim(e.offset.x)}px ${roundDim(e.offset.y)}px ${roundDim(e.radius)}px ${spread}px ${color}`);
     } else if (e.type === 'LAYER_BLUR') {
@@ -319,7 +615,7 @@ const getEffectsStyles = (node: BlendMixin): string[] => {
     }
   }
   if (shadows.length > 0) styles.push(`box-shadow: ${shadows.join(', ')}`);
-  if (blur > 0) styles.push(`filter: blur(${roundDim(blur)}px)`);
+  if (blur > 0) styles.push(`filter: blur(${roundPx(blur / 2)}px)`);
   return styles;
 };
 
@@ -725,12 +1021,13 @@ const getGroupChildPositionStyles = (
   const zIndex = parentGroup.children.indexOf(node);
   if (zIndex >= 0) styles.push(`z-index: ${zIndex}`);
 
-  // Use absoluteBoundingBox when available for correct parent-relative position
+  // Use absoluteBoundingBox when available for correct parent-relative position. When node has rotation, use node.x/node.y so rotation (with transform-origin 0 0) is around top-left per Figma API.
   let left: number;
   let top: number;
+  const rot = 'rotation' in node ? (node as { rotation: number }).rotation : 0;
   const parentBounds = parentGroup.absoluteBoundingBox;
   const nodeBounds = node.absoluteBoundingBox;
-  if (parentBounds && nodeBounds) {
+  if (parentBounds && nodeBounds && !isMeaningfulRotation(rot)) {
     left = nodeBounds.x - parentBounds.x;
     top = nodeBounds.y - parentBounds.y;
   } else {
@@ -787,9 +1084,9 @@ const getGroupChildPositionStyles = (
       break;
   }
 
-  const rot = 'rotation' in node ? (node as { rotation: number }).rotation : 0;
   if (isMeaningfulRotation(rot)) {
-    transformParts.push(`rotate(${roundPx(rot)}deg)`);
+    styles.push('transform-origin: 0 0');
+    transformParts.push(`rotate(${cssRotationDeg(rot)}deg)`);
   }
   if (transformParts.length > 0) {
     styles.push(`transform: ${transformParts.join(' ')}`);
@@ -874,13 +1171,41 @@ const getAbsolutePositionStyles = (
   }
 
   if (isMeaningfulRotation(node.rotation)) {
-    transformParts.push(`rotate(${roundPx(node.rotation)}deg)`);
+    styles.push('transform-origin: 0 0');
+    transformParts.push(`rotate(${cssRotationDeg(node.rotation)}deg)`);
   }
 
   if (transformParts.length > 0) {
     styles.push(`transform: ${transformParts.join(' ')}`);
   }
 
+  return styles;
+};
+
+/** Position styles relative to a container. When container is a mask node, use parent-relative (node.x - container.x, node.y - container.y). decimals: 2 = roundPx, 4 = higher precision for rotated vectors. */
+const getPositionStylesRelativeToContainer = (
+  node: SceneNode,
+  container: { absoluteBoundingBox?: { x: number; y: number } | null; x?: number; y?: number },
+  zIndex: number,
+  decimals: 2 | 4 = 2
+): string[] => {
+  const round = decimals === 4 ? roundPx4 : roundPx;
+  const styles = ['position: absolute', `z-index: ${zIndex}`];
+  if (container && 'isMask' in container && (container as { isMask?: boolean }).isMask === true && typeof (container as { x?: number }).x === 'number' && typeof (container as { y?: number }).y === 'number') {
+    const left = round(node.x - (container as { x: number }).x);
+    const top = round(node.y - (container as { y: number }).y);
+    styles.push(`left: ${left}px`, `top: ${top}px`);
+    return styles;
+  }
+  const containerBounds = container.absoluteBoundingBox;
+  const nodeBounds = node.absoluteBoundingBox;
+  if (containerBounds && nodeBounds) {
+    const left = round(nodeBounds.x - containerBounds.x);
+    const top = round(nodeBounds.y - containerBounds.y);
+    styles.push(`left: ${left}px`, `top: ${top}px`);
+  } else {
+    styles.push(`left: ${round(node.x)}px`, `top: ${round(node.y)}px`);
+  }
   return styles;
 };
 
@@ -945,7 +1270,9 @@ const nodeToHtmlCss = async (
   parentGroup: GroupNode | FrameNode | null = null,
   outputFormat: OutputFormat = 'html',
   indent: number = 0,
-  baseIndent: number = 0
+  baseIndent: number = 0,
+  positionContainer: SceneNode | null = null,
+  flattenedZIndex: number = 0
 ): Promise<ExportNode> => {
   if (node.visible === false) {
     return { html: '' };
@@ -955,9 +1282,15 @@ const nodeToHtmlCss = async (
   const openPrefix = (indent === 0 && baseIndent === 0 ? '' : '\n') + '  '.repeat(baseIndent + indent);
   const closePrefix = '\n' + '  '.repeat(baseIndent + indent);
   const isReact = outputFormat === 'react';
-  let baseName = sanitizeName(node.name) || `node-${node.id.replace(':', '-')}`;
+  const pascalName = toPascalCase(node.name) || sanitizeName(node.name) || `node-${node.id.replace(':', '-')}`;
+  let baseName = pascalName;
   let className = baseName;
   let html = '';
+  let dataLayer = getDataLayerAttr(node.name, outputFormat);
+  if (isMaskNode(node)) {
+    const mt = getMaskType(node);
+    dataLayer += ` data-figma-mask="true"${mt ? ` data-figma-mask-type="${mt}"` : ''}`;
+  }
 
   if (node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE') {
     const frame = node as FrameNode;
@@ -978,10 +1311,13 @@ const nodeToHtmlCss = async (
     classes.push(...sizing.classes);
 
     const styleLines: string[] = [];
-    const fill = getSolidFill(frame);
+    const fill = getFillStyle(frame);
     const inlineStyles = [...sizing.styles];
     let hasPositioningTransform = false;
-    if (parentGroup) {
+    if (positionContainer) {
+      inlineStyles.push(...getPositionStylesRelativeToContainer(frame, positionContainer, flattenedZIndex));
+      hasPositioningTransform = true;
+    } else if (parentGroup) {
       inlineStyles.push(...getGroupChildPositionStyles(frame, parentGroup));
       hasPositioningTransform = true;
     } else {
@@ -997,8 +1333,10 @@ const nodeToHtmlCss = async (
         inlineStyles.push(`z-index: ${z}`);
       }
     }
-    if (fill) inlineStyles.push(`background: ${fill}`);
-    if (!fill && hasImageFill(frame)) inlineStyles.push('background: #e5e7eb');
+    if (!isMaskNode(frame)) {
+      if (fill) inlineStyles.push(`background: ${fill}`);
+      if (!fill && hasImageFill(frame)) inlineStyles.push('background: #e5e7eb');
+    }
     const radius = getCornerRadiusStyle(frame);
     if (radius) inlineStyles.push(radius);
     inlineStyles.push(...getStrokeStyles(frame));
@@ -1006,11 +1344,11 @@ const nodeToHtmlCss = async (
     if (frame.opacity < 1) inlineStyles.push(`opacity: ${roundPx(frame.opacity)}`);
     const blend = 'blendMode' in frame ? mapBlendMode(frame.blendMode) : null;
     if (blend && blend !== 'normal') inlineStyles.push(`mix-blend-mode: ${blend}`);
-    if (frame.clipsContent) inlineStyles.push('overflow: hidden');
+    if ('clipsContent' in frame && frame.clipsContent === true) inlineStyles.push('overflow: hidden');
     // Figma frame dimensions include padding; use border-box so width/height match
     if (frame.layoutMode !== 'NONE') inlineStyles.push('box-sizing: border-box');
     if (isMeaningfulRotation(frame.rotation) && !hasPositioningTransform) {
-      inlineStyles.push(`transform: rotate(${roundPx(frame.rotation)}deg)`);
+      inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(frame.rotation)}deg)`);
     }
     if (styleLines.length > 0) {
       className = getClassForStyle(baseName, styleLines, context);
@@ -1043,7 +1381,7 @@ const nodeToHtmlCss = async (
     if (hasFlexDir && finalClasses.indexOf('flex') < 0) {
       finalClasses.unshift('flex');
     }
-    html += openPrefix + `<div ${getClassAttr(finalClasses, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>`;
+    html += openPrefix + `<div ${dataLayer}${getClassAttr(finalClasses, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>`;
 
     const childParentLayoutMode =
       frame.layoutMode === 'NONE' ? null : frame.layoutMode;
@@ -1052,18 +1390,91 @@ const nodeToHtmlCss = async (
     const childParentGroup =
       frame.layoutMode === 'NONE' ? frame : null;
     const frameChildren = Array.from(frame.children);
-    for (const child of frameChildren) {
-      const childExport = await nodeToHtmlCss(
-        child,
+    const runFrameChild = async (c: SceneNode, posContainer: SceneNode | null, z: number) => {
+      const out = await nodeToHtmlCss(
+        c,
         context,
         childParentLayoutMode,
         childParentFrame,
         childParentGroup,
         outputFormat,
         indent + 1,
-        baseIndent
+        baseIndent,
+        posContainer,
+        z
       );
-      html += childExport.html;
+      return out.html;
+    };
+    let i = 0;
+    while (i < frameChildren.length) {
+      const child = frameChildren[i];
+      const isGroup = child.type === 'GROUP' || child.type === 'TRANSFORM_GROUP';
+      if (frame.layoutMode === 'NONE' && isGroup) {
+        const group = child as GroupNode;
+        const groupChildren = Array.from(group.children);
+        let j = 0;
+        while (j < groupChildren.length) {
+          const gc = groupChildren[j] as SceneNode;
+          if (isMaskNode(gc)) {
+            const clipPath = getClipPathFromMaskNode(gc);
+            let k = j + 1;
+            while (k < groupChildren.length && !isMaskNode(groupChildren[k] as SceneNode)) k++;
+            const maskedCount = k - j - 1;
+            html += await runFrameChild(gc, frame, j);
+            if (clipPath && maskedCount > 0) {
+              const wrapperStyles: string[] = [
+                `width: ${roundDim(gc.width)}px`,
+                `height: ${roundDim(gc.height)}px`,
+                'position: absolute',
+                'overflow: hidden',
+                `clip-path: ${clipPath}`,
+              ];
+              wrapperStyles.push(...getMaskImageStyles(gc));
+              wrapperStyles.push(...getPositionStylesRelativeToContainer(gc, frame, j + 1));
+              const innerIndent = '  '.repeat(baseIndent + indent + 1);
+              html += '\n' + innerIndent + `<div ${getClassAttr([], outputFormat)}${getStyleAttr(wrapperStyles, outputFormat)}>`;
+              for (let m = j + 1; m < k; m++) {
+                html += await runFrameChild(groupChildren[m] as SceneNode, gc, m - j - 1);
+              }
+              html += '\n' + innerIndent + '</div>';
+            }
+            j = k;
+          } else {
+            html += await runFrameChild(gc, frame, j);
+            j++;
+          }
+        }
+        i++;
+      } else if (isMaskNode(child)) {
+        const clipPath = getClipPathFromMaskNode(child);
+        let k = i + 1;
+        while (k < frameChildren.length && !isMaskNode(frameChildren[k])) k++;
+        const maskedCount = k - i - 1;
+        html += await runFrameChild(child, null, 0);
+        if (clipPath && maskedCount > 0) {
+          const wrapperStyles: string[] = [
+            `width: ${roundDim(child.width)}px`,
+            `height: ${roundDim(child.height)}px`,
+            'position: absolute',
+            'overflow: hidden',
+            `clip-path: ${clipPath}`,
+          ];
+          wrapperStyles.push(...getMaskImageStyles(child));
+          const idx = i + 1;
+          const z = frame.itemReverseZIndex ? frameChildren.length - 1 - idx : idx + 1;
+          wrapperStyles.push(...getPositionStylesRelativeToContainer(child, frame, z));
+          const innerIndent = '  '.repeat(baseIndent + indent + 1);
+          html += '\n' + innerIndent + `<div ${getClassAttr([], outputFormat)}${getStyleAttr(wrapperStyles, outputFormat)}>`;
+          for (let m = i + 1; m < k; m++) {
+            html += await runFrameChild(frameChildren[m], child, m - i - 1);
+          }
+          html += '\n' + innerIndent + '</div>';
+        }
+        i = k;
+      } else {
+        html += await runFrameChild(child, null, 0);
+        i++;
+      }
     }
 
     html += closePrefix + `</div>`;
@@ -1084,7 +1495,9 @@ const nodeToHtmlCss = async (
       `width: ${roundDim(group.width)}px`,
       `height: ${roundDim(group.height)}px`
     );
-    if (parentGroup) {
+    if (positionContainer) {
+      inlineStyles.push(...getPositionStylesRelativeToContainer(group, positionContainer, flattenedZIndex));
+    } else if (parentGroup) {
       inlineStyles.push(...getGroupChildPositionStyles(group, parentGroup));
     } else if (parentFrame) {
       if ('layoutPositioning' in group && group.layoutPositioning === 'ABSOLUTE') {
@@ -1100,8 +1513,8 @@ const nodeToHtmlCss = async (
     } else {
       inlineStyles.push('position: relative');
     }
-    if ('fills' in group && group.fills !== figma.mixed) {
-      const fill = getSolidFill(group as unknown as GeometryMixin);
+    if ('fills' in group && group.fills !== figma.mixed && !isMaskNode(group)) {
+      const fill = getFillStyle(group as unknown as GeometryMixin);
       if (fill) inlineStyles.push(`background: ${fill}`);
       else if (hasImageFill(group as unknown as GeometryMixin)) inlineStyles.push('background: #e5e7eb');
     }
@@ -1119,7 +1532,7 @@ const nodeToHtmlCss = async (
     const groupBlend = 'blendMode' in group ? mapBlendMode(group.blendMode) : null;
     if (groupBlend && groupBlend !== 'normal') inlineStyles.push(`mix-blend-mode: ${groupBlend}`);
     if (isMeaningfulRotation(group.rotation)) {
-      inlineStyles.push(`transform: rotate(${roundPx(group.rotation)}deg)`);
+      inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(group.rotation)}deg)`);
     }
 
     if (classes.length === 0) {
@@ -1136,21 +1549,54 @@ const nodeToHtmlCss = async (
       return true;
     });
     inlineStyles.push('overflow: visible');
-    html += openPrefix + `<div ${getClassAttr(finalClasses, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>`;
+    html += openPrefix + `<div ${dataLayer}${getClassAttr(finalClasses, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>`;
 
-    for (const child of group.children) {
-      if (!('type' in child)) continue;
-      const childExport = await nodeToHtmlCss(
-        child as SceneNode,
-        context,
-        null,
-        null,
-        group,
-        outputFormat,
-        indent + 1,
-        baseIndent
-      );
-      html += childExport.html;
+    const groupChildren = Array.from(group.children).filter((c): c is SceneNode => 'type' in c);
+    let gi = 0;
+    while (gi < groupChildren.length) {
+      const child = groupChildren[gi];
+      if (isMaskNode(child)) {
+        const clipPath = getClipPathFromMaskNode(child);
+        let k = gi + 1;
+        while (k < groupChildren.length && !isMaskNode(groupChildren[k])) k++;
+        const maskedCount = k - gi - 1;
+        const childExport = await nodeToHtmlCss(child, context, null, null, group, outputFormat, indent + 1, baseIndent);
+        html += childExport.html;
+        if (clipPath && maskedCount > 0) {
+          const wrapperStyles: string[] = [
+            `width: ${roundDim(child.width)}px`,
+            `height: ${roundDim(child.height)}px`,
+            'position: absolute',
+            'overflow: hidden',
+            `clip-path: ${clipPath}`,
+          ];
+          wrapperStyles.push(...getMaskImageStyles(child));
+          wrapperStyles.push(...getPositionStylesRelativeToContainer(child, group, gi + 1));
+          const innerIndent = '  '.repeat(baseIndent + indent + 1);
+          html += '\n' + innerIndent + `<div ${getClassAttr([], outputFormat)}${getStyleAttr(wrapperStyles, outputFormat)}>`;
+          for (let m = gi + 1; m < k; m++) {
+            const sibExport = await nodeToHtmlCss(
+              groupChildren[m],
+              context,
+              null,
+              null,
+              group,
+              outputFormat,
+              indent + 1,
+              baseIndent,
+              child,
+              m - gi - 1
+            );
+            html += sibExport.html;
+          }
+          html += '\n' + innerIndent + '</div>';
+        }
+        gi = k;
+      } else {
+        const childExport = await nodeToHtmlCss(child, context, null, null, group, outputFormat, indent + 1, baseIndent);
+        html += childExport.html;
+        gi++;
+      }
     }
 
     html += closePrefix + `</div>`;
@@ -1241,7 +1687,9 @@ const nodeToHtmlCss = async (
     const sizing = registerSizingUtilities(text, parentLayoutMode, context);
     classes.push(...sizing.classes);
     inlineStyles.push(...sizing.styles);
-    if (parentGroup) {
+    if (positionContainer) {
+      inlineStyles.push(...getPositionStylesRelativeToContainer(text, positionContainer, flattenedZIndex));
+    } else if (parentGroup) {
       inlineStyles.push(...getGroupChildPositionStyles(text, parentGroup));
     } else {
       inlineStyles.push(...getAbsolutePositionStyles(text, parentFrame));
@@ -1263,35 +1711,50 @@ const nodeToHtmlCss = async (
           .map((segment) => {
             const paints = segment.fills as ReadonlyArray<Paint>;
             const segmentFill = Array.isArray(paints)
-              ? getSolidFillFromPaints(paints)
+              ? getFillStyleFromPaints(paints)
               : null;
             const segmentText = escapeText(segment.characters);
             if (!segmentFill) return segmentText;
+            const isGradient = /^(linear|radial|conic)-gradient\(/.test(segmentFill);
+            const spanStyle = isGradient
+              ? `background: ${segmentFill}; color: transparent; background-clip: text; -webkit-background-clip: text`
+              : `color: ${segmentFill}`;
             if (outputFormat === 'react') {
-              return `<span style={{ color: '${segmentFill.replace(/'/g, "\\'")}' }}>${segmentText}</span>`;
+              const reactStyle = isGradient
+                ? `background: '${segmentFill.replace(/'/g, "\\'")}', color: 'transparent', backgroundClip: 'text', WebkitBackgroundClip: 'text'`
+                : `color: '${segmentFill.replace(/'/g, "\\'")}'`;
+              return `<span style={{ ${reactStyle} }}>${segmentText}</span>`;
             }
-            return `<span style="color: ${segmentFill}">${segmentText}</span>`;
+            return `<span style="${spanStyle}">${segmentText}</span>`;
           })
           .join('');
       } catch {
-        const textFill = getSolidTextFill(text);
-        if (textFill) inlineStyles.push(`color: ${textFill}`);
+        const textFill = getSolidTextFill(text) || getFillStyleFromPaints((text.fills as unknown) as ReadonlyArray<Paint>);
+        if (textFill) {
+          const isGradient = /^(linear|radial|conic)-gradient\(/.test(textFill);
+          if (isGradient) inlineStyles.push(`background: ${textFill}`, 'color: transparent', 'background-clip: text', '-webkit-background-clip: text');
+          else inlineStyles.push(`color: ${textFill}`);
+        }
       }
     } else {
-      const textFill = getSolidTextFill(text);
-      if (textFill) inlineStyles.push(`color: ${textFill}`);
+      const textFill = getSolidTextFill(text) || getFillStyleFromPaints(text.fills as ReadonlyArray<Paint>);
+      if (textFill) {
+        const isGradient = /^(linear|radial|conic)-gradient\(/.test(textFill);
+        if (isGradient) inlineStyles.push(`background: ${textFill}`, 'color: transparent', 'background-clip: text', '-webkit-background-clip: text');
+        else inlineStyles.push(`color: ${textFill}`);
+      }
     }
     if (text.paragraphSpacing > 0) inlineStyles.push(`margin-bottom: ${text.paragraphSpacing}px`);
     if (text.opacity < 1) inlineStyles.push(`opacity: ${roundPx(text.opacity)}`);
     if (isMeaningfulRotation(text.rotation) && inlineStyles.every((style) => !style.startsWith('transform:'))) {
-      inlineStyles.push(`transform: rotate(${roundPx(text.rotation)}deg)`);
+      inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(text.rotation)}deg)`);
     }
 
     if (classes.length === 0) {
       registerUtilityClass('text', [], context);
       classes.push('text');
     }
-    html += openPrefix + `<p ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>${textContent}</p>`;
+    html += openPrefix + `<p ${dataLayer}${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>${textContent}</p>`;
   }
 
   if (node.type === 'RECTANGLE') {
@@ -1301,9 +1764,65 @@ const nodeToHtmlCss = async (
     if (isInvisibleSpacer) {
       return { html: '' };
     }
+    const fill = getSolidFill(rect);
+    const rectBlurRadius = getLayerBlurRadius(rect as BlendMixin);
+    if (fill && rectBlurRadius > 0) {
+      const classes: string[] = [getUniqueClassName(pascalName, context)];
+      const container = positionContainer || parentGroup || parentFrame;
+      const z = positionContainer
+        ? flattenedZIndex
+        : parentGroup
+          ? parentGroup.children.indexOf(rect)
+          : parentFrame
+            ? parentFrame.children.indexOf(rect)
+            : 0;
+      const rotated = isMeaningfulRotation(rect.rotation);
+      const aabb = rect.absoluteBoundingBox;
+      const blurPx = roundPx(rectBlurRadius / 2);
+      const radiusStyle = getCornerRadiusStyle(rect);
+      const borderRadius = radiusStyle ? radiusStyle.replace('border-radius: ', '').trim() : null;
+
+      if (rotated && aabb && typeof aabb.width === 'number' && typeof aabb.height === 'number') {
+        const outerStyles: string[] = [
+          `width: ${roundPx(aabb.width)}px`,
+          `height: ${roundPx(aabb.height)}px`,
+        ];
+        if (container) {
+          outerStyles.push(...getPositionStylesRelativeToContainer(rect, container, z));
+        }
+        const innerStyles: string[] = [
+          `width: ${roundPx(rect.width)}px`,
+          `height: ${roundPx(rect.height)}px`,
+          'position: absolute',
+          'left: 50%',
+          'top: 50%',
+          `transform: translate(-50%, -50%) rotate(${cssRotationDeg(rect.rotation)}deg)`,
+          `filter: blur(${blurPx}px)`,
+        ];
+        if (!isMaskNode(rect)) innerStyles.push(`background: ${fill}`);
+        if (borderRadius) innerStyles.push(`border-radius: ${borderRadius}`);
+        const innerIndent = '  '.repeat(baseIndent + indent + 1);
+        html += openPrefix + `<div ${dataLayer}${getClassAttr(classes, outputFormat)}${getStyleAttr(outerStyles, outputFormat)}>`;
+        html += '\n' + innerIndent + `<div ${getStyleAttr(innerStyles, outputFormat)}></div>`;
+        html += closePrefix + `</div>`;
+      } else {
+        const inlineStyles: string[] = [
+          `width: ${roundPx(rect.width)}px`,
+          `height: ${roundPx(rect.height)}px`,
+        ];
+        if (container) {
+          inlineStyles.push(...getPositionStylesRelativeToContainer(rect, container, z));
+        }
+        if (!isMaskNode(rect)) inlineStyles.push(`background: ${fill}`);
+        if (borderRadius) inlineStyles.push(`border-radius: ${borderRadius}`);
+        inlineStyles.push(`filter: blur(${blurPx}px)`);
+        html += openPrefix + `<div ${dataLayer}${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
+      }
+      return { html };
+    }
+
     const classes: string[] = [];
     const styleLines: string[] = [];
-    const fill = getSolidFill(rect);
     if (rect.cornerRadius !== figma.mixed) {
       styleLines.push(`  border-radius: ${roundDim(rect.cornerRadius)}px;`);
     }
@@ -1312,7 +1831,9 @@ const nodeToHtmlCss = async (
     const sizing = registerSizingUtilities(rect, parentLayoutMode, context);
     classes.push(...sizing.classes);
     const inlineStyles = [...sizing.styles];
-    if (parentGroup) {
+    if (positionContainer) {
+      inlineStyles.push(...getPositionStylesRelativeToContainer(rect, positionContainer, flattenedZIndex));
+    } else if (parentGroup) {
       inlineStyles.push(...getGroupChildPositionStyles(rect, parentGroup));
     } else {
       inlineStyles.push(...getAbsolutePositionStyles(rect, parentFrame));
@@ -1325,8 +1846,9 @@ const nodeToHtmlCss = async (
         inlineStyles.push(`z-index: ${z}`);
       }
     }
-    if (fill) inlineStyles.push(`background: ${fill}`);
-    if (!fill && hasImageFill(rect)) inlineStyles.push('background: #e5e7eb');
+    const rectFill = isMaskNode(rect) ? null : getFillStyle(rect);
+    if (rectFill) inlineStyles.push(`background: ${rectFill}`);
+    if (!rectFill && !isMaskNode(rect) && hasImageFill(rect)) inlineStyles.push('background: #e5e7eb');
     const radius = getCornerRadiusStyle(rect);
     if (radius) inlineStyles.push(radius);
     inlineStyles.push(...getStrokeStyles(rect));
@@ -1335,72 +1857,187 @@ const nodeToHtmlCss = async (
     const rectBlend = 'blendMode' in rect ? mapBlendMode(rect.blendMode) : null;
     if (rectBlend && rectBlend !== 'normal') inlineStyles.push(`mix-blend-mode: ${rectBlend}`);
     if (isMeaningfulRotation(rect.rotation) && inlineStyles.every((style) => !style.startsWith('transform:'))) {
-      inlineStyles.push(`transform: rotate(${roundPx(rect.rotation)}deg)`);
+      inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(rect.rotation)}deg)`);
     }
-    html += openPrefix + `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
+    html += openPrefix + `<div ${dataLayer}${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
+  }
+
+  if (node.type === 'ELLIPSE') {
+    const ellipse = node as EllipseNode;
+    const fill = getSolidFill(ellipse);
+    const blurRadius = getLayerBlurRadius(ellipse as BlendMixin);
+    if (fill && blurRadius > 0) {
+      const classes: string[] = [getUniqueClassName(pascalName, context)];
+      const container = positionContainer || parentGroup || parentFrame;
+      const z = positionContainer
+        ? flattenedZIndex
+        : parentGroup
+          ? parentGroup.children.indexOf(ellipse)
+          : parentFrame
+            ? parentFrame.children.indexOf(ellipse)
+            : 0;
+      const rotated = isMeaningfulRotation(ellipse.rotation);
+      const aabb = ellipse.absoluteBoundingBox;
+      const blurPx = roundPx(blurRadius / 2);
+
+      if (rotated && aabb && typeof aabb.width === 'number' && typeof aabb.height === 'number') {
+        const outerStyles: string[] = [
+          `width: ${roundPx(aabb.width)}px`,
+          `height: ${roundPx(aabb.height)}px`,
+        ];
+        if (container) {
+          outerStyles.push(...getPositionStylesRelativeToContainer(ellipse, container, z));
+        }
+        const innerStyles: string[] = [
+          `width: ${roundPx(ellipse.width)}px`,
+          `height: ${roundPx(ellipse.height)}px`,
+          'position: absolute',
+          'left: 50%',
+          'top: 50%',
+          `transform: translate(-50%, -50%) rotate(${cssRotationDeg(ellipse.rotation)}deg)`,
+          'border-radius: 9999px',
+          `filter: blur(${blurPx}px)`,
+        ];
+        if (!isMaskNode(ellipse)) innerStyles.push(`background: ${fill}`);
+        const innerIndent = '  '.repeat(baseIndent + indent + 1);
+        html += openPrefix + `<div ${dataLayer}${getClassAttr(classes, outputFormat)}${getStyleAttr(outerStyles, outputFormat)}>`;
+        html += '\n' + innerIndent + `<div ${getStyleAttr(innerStyles, outputFormat)}></div>`;
+        html += closePrefix + `</div>`;
+      } else {
+        const inlineStyles: string[] = [
+          `width: ${roundPx(ellipse.width)}px`,
+          `height: ${roundPx(ellipse.height)}px`,
+        ];
+        if (container) {
+          inlineStyles.push(...getPositionStylesRelativeToContainer(ellipse, container, z));
+        }
+        if (!isMaskNode(ellipse)) inlineStyles.push(`background: ${fill}`);
+        inlineStyles.push('border-radius: 9999px');
+        inlineStyles.push(`filter: blur(${blurPx}px)`);
+        html += openPrefix + `<div ${dataLayer}${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
+      }
+      return { html };
+    }
   }
 
   if (isVectorNode(node)) {
     const classes: string[] = [];
     const sizing = registerSizingUtilities(node, parentLayoutMode, context);
     classes.push(...sizing.classes);
-    const inlineStyles = [...sizing.styles];
-    if (parentGroup) {
-      inlineStyles.push(...getGroupChildPositionStyles(node, parentGroup));
+    const baseInlineStyles: string[] = [...sizing.styles];
+    if (positionContainer) {
+      baseInlineStyles.push(...getPositionStylesRelativeToContainer(node, positionContainer, flattenedZIndex));
+    } else if (parentGroup) {
+      baseInlineStyles.push(...getGroupChildPositionStyles(node, parentGroup));
     } else {
-      inlineStyles.push(...getAbsolutePositionStyles(node, parentFrame));
+      baseInlineStyles.push(...getAbsolutePositionStyles(node, parentFrame));
       if (!isAbsoluteChild(node, parentFrame) && parentFrame) {
-        inlineStyles.push('position: relative');
+        baseInlineStyles.push('position: relative');
         const idx = parentFrame.children.indexOf(node);
         const z = parentFrame.itemReverseZIndex
           ? parentFrame.children.length - 1 - idx
           : 1;
-        inlineStyles.push(`z-index: ${z}`);
+        baseInlineStyles.push(`z-index: ${z}`);
       }
     }
-    inlineStyles.push(...getEffectsStyles(node as BlendMixin));
+    baseInlineStyles.push(...getEffectsStyles(node as BlendMixin));
     const vecBlend = 'blendMode' in node ? mapBlendMode(node.blendMode) : null;
-    if (vecBlend && vecBlend !== 'normal') inlineStyles.push(`mix-blend-mode: ${vecBlend}`);
-    if (isMeaningfulRotation(node.rotation) && inlineStyles.every((style) => !style.startsWith('transform:'))) {
-      inlineStyles.push(`transform: rotate(${roundPx(node.rotation)}deg)`);
-    }
+    if (vecBlend && vecBlend !== 'normal') baseInlineStyles.push(`mix-blend-mode: ${vecBlend}`);
+
+    const rotated = isMeaningfulRotation(node.rotation);
+    const aabb = node.absoluteBoundingBox;
+    const useAabbWrapper = rotated && aabb && typeof aabb.width === 'number' && typeof aabb.height === 'number';
+    const container = positionContainer || parentGroup || parentFrame;
+    const z = positionContainer
+      ? flattenedZIndex
+      : parentGroup
+        ? parentGroup.children.indexOf(node)
+        : parentFrame
+          ? parentFrame.children.indexOf(node)
+          : 0;
 
     const usePlaceholder = hasInvisibleStrokesOnly(node as GeometryMixin);
+
+    const buildVectorContent = (innerStyles: string[], contentHtml: string): string => {
+      if (useAabbWrapper && container) {
+        const r = roundPx4;
+        const outerStyles: string[] = [
+          `width: ${r(aabb!.width)}px`,
+          `height: ${r(aabb!.height)}px`,
+        ];
+        outerStyles.push(...getPositionStylesRelativeToContainer(node, container, z, 4));
+        const innerWrapperStyles: string[] = [
+          `width: ${r(aabb!.width)}px`,
+          `height: ${r(aabb!.height)}px`,
+          'position: absolute',
+          'left: 50%',
+          'top: 50%',
+          'transform: translate(-50%, -50%)',
+        ];
+        const innerIndent = '  '.repeat(baseIndent + indent + 1);
+        return (
+          openPrefix + `<div ${dataLayer}${getClassAttr(classes, outputFormat)}${getStyleAttr(outerStyles, outputFormat)}>` +
+          '\n' + innerIndent + `<div ${getStyleAttr(innerWrapperStyles, outputFormat)}>` +
+          (contentHtml ? '\n' + contentHtml + '\n' + innerIndent : '') +
+          `</div>` +
+          closePrefix + `</div>`
+        );
+      }
+      return openPrefix + `<div ${dataLayer}${getClassAttr(classes, outputFormat)}${getStyleAttr(innerStyles, outputFormat)}>` +
+        (contentHtml ? '\n' + contentHtml + '\n' + '  '.repeat(baseIndent + indent) : '') +
+        `</div>`;
+    };
+
     if (usePlaceholder) {
+      const inlineStyles = [...baseInlineStyles];
       if (!inlineStyles.some((s) => s.startsWith('width:') || s.startsWith('height:'))) {
         inlineStyles.push(`width: ${Math.round(node.width)}px`, `height: ${Math.round(node.height)}px`);
       }
-      const vecFill = getSolidFill(node as GeometryMixin);
-      if (vecFill) inlineStyles.push(`background: ${vecFill}`);
-      else if (hasImageFill(node as GeometryMixin)) inlineStyles.push('background: #e5e7eb');
-      else inlineStyles.push('background: #e5e7eb');
+      if (!isMaskNode(node)) {
+        const vecFill = getFillStyle(node as GeometryMixin);
+        if (vecFill) inlineStyles.push(`background: ${vecFill}`);
+        else if (hasImageFill(node as GeometryMixin)) inlineStyles.push('background: #e5e7eb');
+        else inlineStyles.push('background: #e5e7eb');
+      }
       inlineStyles.push(...getStrokeStyles(node as GeometryMixin));
       if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
-      html += openPrefix + `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
+      if (!useAabbWrapper) {
+        if (isMeaningfulRotation(node.rotation)) inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(node.rotation)}deg)`);
+      }
+      html += buildVectorContent(inlineStyles, '');
     } else {
       try {
         const svgBytes = await node.exportAsync({ format: 'SVG' });
         let svgText = decodeSvgBytes(svgBytes);
         context.svgIdCounter += 1;
         svgText = makeSvgIdsUnique(svgText, `s${context.svgIdCounter}`);
-        const svgIndent = '  '.repeat(baseIndent + indent + 1);
+        if (!useAabbWrapper) {
+          svgText = normalizeSvgToNodeSize(svgText, node.width, node.height);
+        }
+        const svgIndent = '  '.repeat(useAabbWrapper ? baseIndent + indent + 2 : baseIndent + indent + 1);
         const indentedSvg = svgText.split('\n').map((line) => svgIndent + line).join('\n').replace(/\s+$/, '');
-        html +=
-          openPrefix +
-          `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}>` +
-          '\n' + indentedSvg + '\n' + '  '.repeat(baseIndent + indent) +
-          `</div>`;
+        const inlineStyles = [...baseInlineStyles];
+        if (!useAabbWrapper && isMeaningfulRotation(node.rotation)) {
+          inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(node.rotation)}deg)`);
+        }
+        html += buildVectorContent(inlineStyles, indentedSvg);
       } catch (vectorErr) {
+        const inlineStyles = [...baseInlineStyles];
         if (!inlineStyles.some((s) => s.startsWith('width:') || s.startsWith('height:'))) {
           inlineStyles.push(`width: ${roundDim(node.width)}px`, `height: ${roundDim(node.height)}px`);
         }
-        const vecFill = getSolidFill(node as GeometryMixin);
-        if (vecFill) inlineStyles.push(`background: ${vecFill}`);
-        else if (hasImageFill(node as GeometryMixin)) inlineStyles.push('background: #e5e7eb');
-        else inlineStyles.push('background: #e5e7eb');
+        if (!isMaskNode(node)) {
+          const vecFill = getFillStyle(node as GeometryMixin);
+          if (vecFill) inlineStyles.push(`background: ${vecFill}`);
+          else if (hasImageFill(node as GeometryMixin)) inlineStyles.push('background: #e5e7eb');
+          else inlineStyles.push('background: #e5e7eb');
+        }
         inlineStyles.push(...getStrokeStyles(node as GeometryMixin));
         if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
-        html += openPrefix + `<div ${getClassAttr(classes, outputFormat)}${getStyleAttr(inlineStyles, outputFormat)}></div>`;
+        if (!useAabbWrapper && isMeaningfulRotation(node.rotation)) {
+          inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(node.rotation)}deg)`);
+        }
+        html += buildVectorContent(inlineStyles, '');
       }
     }
   }
