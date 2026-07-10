@@ -27,6 +27,8 @@ _(none)_
 
 ## 1.4.2 — 2026-07-11
 
+**Commit:** `79d18b1`
+
 - Gradient and dashed stroke export (solid/gradient paints, `border-image`, `border-style: dashed`)
 - Skip `overflow: hidden` on clipped frames when a descendant has layer blur
 - TypeScript/ESLint cleanup: Figma plugin typings in `tsconfig`, remove unused helpers
@@ -156,7 +158,7 @@ _(none)_
 
 | Date | Commit | Message | Version |
 |------|--------|---------|---------|
-| 2026-07-11 | _(this release)_ | gradient/dashed strokes, lint, agent docs | **1.4.2** *(current)* |
+| 2026-07-11 | `79d18b1` | gradient/dashed strokes, lint, agent docs | **1.4.2** *(current)* |
 | 2026-02-17 | `40bf615` | rotation issue | 1.4.1 |
 | 2026-02-15 | `095969b` | export support for group onj | 1.4.0 |
 | 2026-02-14 | `920b5b7` | preview features | 1.3.0 |
