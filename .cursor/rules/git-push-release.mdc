@@ -1,0 +1,91 @@
+---
+description: >-
+  Prompt listener for "git push", "git push minor", and "git push major".
+  Runs release: inspect changes, bump version, update docs, commit, push, verify clean.
+alwaysApply: true
+---
+
+# Git push release listener
+
+When the user message is (or clearly means) one of:
+
+| User says | Bump |
+|-----------|------|
+| `git push` | **patch** → `x.x.X` |
+| `git push minor` | **minor** → `x.X.0` |
+| `git push major` | **major** → `X.0.0` |
+
+…do **not** only run `git push`. Execute the full release workflow below, in order.
+
+Ignore this rule for normal chat that merely mentions pushing in passing (e.g. “should we push later?”). Only trigger when the user is issuing the release command.
+
+---
+
+## Workflow (mandatory order)
+
+### 1. Inspect changes
+
+Run in parallel:
+
+- `git status`
+- `git diff` and `git diff --staged`
+- `git log -5 --oneline`
+
+Summarize which files changed and why (feature / fix / docs / tooling). Exclude junk (`.DS_Store`, secrets).
+
+### 2. Bump version
+
+Read current version from `VERSION.md` and `package.json` (must match).
+
+Bump per the command:
+
+- **patch** (`git push`): `1.4.1` → `1.4.2`
+- **minor** (`git push minor`): `1.4.1` → `1.5.0`
+- **major** (`git push major`): `1.4.1` → `2.0.0`
+
+Update:
+
+1. `VERSION.md` — set **Current version**, move Unreleased notes into a new dated section with commit placeholder, clear/reset Unreleased
+2. `package.json` — `"version"` field to the same value
+
+### 3. Update README.md
+
+Reflect user-facing behavior that landed in this release (features, requirements, mapping notes). Skip fluff; keep accurate.
+
+### 4. Update AGENTS.md
+
+Sync agent guidance with the current architecture, commands, and conventions after this release.
+
+### 5. Commit everything
+
+Follow the repo commit protocol (status/diff/log → stage → HEREDOC commit message → verify).
+
+- Stage all intentional project changes (including `VERSION.md`, `package.json`, `README.md`, `AGENTS.md`, code, rules).
+- Do **not** stage `.DS_Store` or secrets.
+- Commit message: concise, match the **actual change context** (what/why from the diff). Do **not** mention the version number or use a generic `release: vX.Y.Z` prefix.
+  - Examples: `fix rotation handling and clean up TypeScript lint errors`, `add group export support`, `update plugin UI layout`
+- After commit, working tree must be clean except ignored files.
+
+### 6. Push and verify clean
+
+```bash
+git push
+git status
+```
+
+- Push the current branch to `origin` (use `-u` only if upstream is missing).
+- Confirm: branch up to date with remote, **no uncommitted changes**.
+- Report to the user: new version, commit hash, push result, clean status.
+
+### 7. Optional tag
+
+If appropriate after a successful push: `git tag vX.Y.Z && git push origin vX.Y.Z` (only if tags are already used or the user wants them).
+
+---
+
+## Hard stops
+
+- If there is **nothing to commit** and nothing unpushed, say so and do not invent a bump.
+- If bump type is ambiguous, ask once: patch / minor / major.
+- Never force-push `main`/`master`.
+- Never skip hooks (`--no-verify`) unless the user explicitly asks.

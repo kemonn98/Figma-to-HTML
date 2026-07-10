@@ -1,3 +1,5 @@
+/// <reference types="@figma/plugin-typings" />
+
 type ExportResult =
   | { format: 'html'; html: string; css: string; frameWidth: number; frameHeight: number }
   | { format: 'react'; jsx: string; css: string; frameWidth: number; frameHeight: number };
@@ -171,16 +173,6 @@ const getSolidTextFill = (text: TextNode) => {
   return toCssColor(r, g, b, a);
 };
 
-const getSolidFillFromPaints = (paints: ReadonlyArray<Paint>) => {
-  const fill = paints.find((paint) => paint.type === 'SOLID' && paint.visible !== false) as
-    | SolidPaint
-    | undefined;
-  if (!fill) return null;
-  const { r, g, b } = fill.color;
-  const a = fill.opacity ?? 1;
-  return toCssColor(r, g, b, a);
-};
-
 /** Figma gradient paint (plugin API uses gradientTransform + gradientStops). */
 type FigmaGradientPaint = {
   type: 'GRADIENT_LINEAR' | 'GRADIENT_RADIAL' | 'GRADIENT_ANGULAR' | 'GRADIENT_DIAMOND';
@@ -216,8 +208,6 @@ const gradientTransformToLinearCss = (t: Transform): string => {
 const gradientTransformToRadialCss = (t: Transform): string => {
   const tx = t[0][2];
   const ty = t[1][2];
-  const a = t[0][0];
-  const d = t[1][1];
   const scaleX = Math.sqrt(t[0][0] * t[0][0] + t[1][0] * t[1][0]);
   const scaleY = Math.sqrt(t[0][1] * t[0][1] + t[1][1] * t[1][1]);
   const cx = Math.round(tx * 100);
@@ -372,19 +362,6 @@ const hasInvisibleStrokesOnly = (node: GeometryMixin): boolean => {
     return opacity > 0;
   });
   return !hasVisibleStroke;
-};
-
-const formatLineHeight = (lineHeight: TextNode['lineHeight']) => {
-  if (lineHeight === figma.mixed) return 'normal';
-  if (lineHeight.unit === 'AUTO') return 'normal';
-  if (lineHeight.unit === 'PERCENT') return `${lineHeight.value}%`;
-  return `${lineHeight.value}px`;
-};
-
-const formatLetterSpacing = (letterSpacing: TextNode['letterSpacing']) => {
-  if (letterSpacing === figma.mixed) return 'normal';
-  if (letterSpacing.unit === 'PERCENT') return `${letterSpacing.value}%`;
-  return `${letterSpacing.value}px`;
 };
 
 const formatFontFamily = (fontName: TextNode['fontName']) => {
@@ -568,28 +545,83 @@ const getClipPathFromMaskNode = (node: SceneNode): string | null => {
   return null;
 };
 
+/** First visible stroke paint (solid or gradient). Same paint types as fills: SOLID, GRADIENT_LINEAR, GRADIENT_RADIAL, GRADIENT_ANGULAR, GRADIENT_DIAMOND. */
+const getStrokePaint = (node: GeometryMixin): SolidPaint | FigmaGradientPaint | null => {
+  if (!('strokes' in node) || !Array.isArray(node.strokes) || node.strokes.length === 0) return null;
+  const p = node.strokes.find((paint) => paint.visible !== false);
+  if (!p || (p.type !== 'SOLID' && p.type !== 'GRADIENT_LINEAR' && p.type !== 'GRADIENT_RADIAL' && p.type !== 'GRADIENT_ANGULAR' && p.type !== 'GRADIENT_DIAMOND')) return null;
+  const opacity = p.opacity ?? 1;
+  if (opacity <= 0) return null;
+  return p as SolidPaint | FigmaGradientPaint;
+};
+
+/** CSS value for stroke paint (color string or gradient). */
+const strokePaintToCss = (paint: SolidPaint | FigmaGradientPaint): string => {
+  if (paint.type === 'SOLID') {
+    const { r, g, b } = paint.color;
+    return toCssColor(r, g, b, paint.opacity ?? 1);
+  }
+  return paintToCssBackground(paint as FigmaGradientPaint);
+};
+
+/** Whether the node has a dashed stroke (dashPattern / strokeDashes). Plugin API may use strokeDashes. */
+const getStrokeDashPattern = (node: SceneNode): number[] | null => {
+  const dashes = (node as { strokeDashes?: number[]; dashPattern?: number[] }).strokeDashes ?? (node as { dashPattern?: number[] }).dashPattern;
+  if (!Array.isArray(dashes) || dashes.length === 0) return null;
+  return dashes;
+};
+
+/** strokeAlign: INSIDE | CENTER | OUTSIDE. */
+const getStrokeAlign = (node: SceneNode): 'INSIDE' | 'CENTER' | 'OUTSIDE' => {
+  if (!('strokeAlign' in node)) return 'INSIDE';
+  const v = (node as { strokeAlign?: string }).strokeAlign;
+  if (v === 'CENTER' || v === 'OUTSIDE') return v;
+  return 'INSIDE';
+};
+
+/** strokeWeight in px; can be figma.mixed. */
+const getStrokeWeight = (node: SceneNode): number => {
+  if (!('strokeWeight' in node) || (node as { strokeWeight?: number | symbol }).strokeWeight === figma.mixed) return 1;
+  const w = (node as { strokeWeight: number }).strokeWeight;
+  return roundDim(typeof w === 'number' ? w : 1);
+};
+
 const getStrokeStyles = (node: GeometryMixin): string[] => {
   const styles: string[] = [];
-  if (!('strokes' in node) || !Array.isArray(node.strokes) || node.strokes.length === 0) return styles;
-  const stroke = node.strokes.find((p) => p.type === 'SOLID' && p.visible !== false) as SolidPaint | undefined;
+  const stroke = getStrokePaint(node);
   if (!stroke) return styles;
-  const w = roundDim('strokeWeight' in node && node.strokeWeight !== figma.mixed ? node.strokeWeight : 1);
-  const align = 'strokeAlign' in node && typeof (node as { strokeAlign?: string }).strokeAlign === 'string'
-    ? (node as { strokeAlign: string }).strokeAlign
-    : 'INSIDE';
-  const { r, g, b } = stroke.color;
-  const a = stroke.opacity ?? 1;
-  const color = toCssColor(r, g, b, a);
-  if (align === 'INSIDE') {
-    styles.push(`box-shadow: inset 0 0 0 ${w}px ${color}`);
-  } else if (align === 'OUTSIDE') {
-    styles.push(`outline: ${w}px solid ${color}`);
-    styles.push('outline-offset: 0');
+
+  const w = getStrokeWeight(node as SceneNode);
+  const align = getStrokeAlign(node as SceneNode);
+  const dashPattern = getStrokeDashPattern(node as SceneNode);
+  const isDashed = dashPattern !== null && dashPattern.length > 0;
+
+  const isGradient = stroke.type !== 'SOLID';
+  const strokeCss = strokePaintToCss(stroke);
+
+  if (isGradient) {
+    // Gradient stroke: use border-image (position is effectively center). Note: border-image ignores border-radius in CSS.
+    styles.push(`border: ${w}px solid transparent`);
+    styles.push(`border-image: ${strokeCss} 1`);
+    styles.push('border-image-slice: 1');
   } else {
-    styles.push(`border: ${w}px solid ${color}`);
+    if (align === 'INSIDE') {
+      styles.push(`box-shadow: inset 0 0 0 ${w}px ${strokeCss}`);
+    } else if (align === 'OUTSIDE') {
+      styles.push(`outline: ${w}px solid ${strokeCss}`);
+      styles.push('outline-offset: 0');
+    } else {
+      styles.push(`border: ${w}px solid ${strokeCss}`);
+    }
   }
+
+  if (isDashed) {
+    // For divs, border-style: dashed is the only option; exact dash pattern is SVG-only (stroke-dasharray).
+    styles.push('border-style: dashed');
+  }
+
   return styles;
-};
+}
 
 const getEffectsStyles = (node: BlendMixin): string[] => {
   const styles: string[] = [];
@@ -1281,9 +1313,8 @@ const nodeToHtmlCss = async (
   // Pretty-print for both HTML and React. HTML uses baseIndent=2 so body content aligns under <body>; React uses 0 and wrapper adds 4 spaces.
   const openPrefix = (indent === 0 && baseIndent === 0 ? '' : '\n') + '  '.repeat(baseIndent + indent);
   const closePrefix = '\n' + '  '.repeat(baseIndent + indent);
-  const isReact = outputFormat === 'react';
   const pascalName = toPascalCase(node.name) || sanitizeName(node.name) || `node-${node.id.replace(':', '-')}`;
-  let baseName = pascalName;
+  const baseName = pascalName;
   let className = baseName;
   let html = '';
   let dataLayer = getDataLayerAttr(node.name, outputFormat);
@@ -1344,7 +1375,13 @@ const nodeToHtmlCss = async (
     if (frame.opacity < 1) inlineStyles.push(`opacity: ${roundPx(frame.opacity)}`);
     const blend = 'blendMode' in frame ? mapBlendMode(frame.blendMode) : null;
     if (blend && blend !== 'normal') inlineStyles.push(`mix-blend-mode: ${blend}`);
-    if ('clipsContent' in frame && frame.clipsContent === true) inlineStyles.push('overflow: hidden');
+    if (
+      'clipsContent' in frame &&
+      frame.clipsContent === true &&
+      !hasDescendantWithLayerBlur(frame)
+    ) {
+      inlineStyles.push('overflow: hidden');
+    }
     // Figma frame dimensions include padding; use border-box so width/height match
     if (frame.layoutMode !== 'NONE') inlineStyles.push('box-sizing: border-box');
     if (isMeaningfulRotation(frame.rotation) && !hasPositioningTransform) {

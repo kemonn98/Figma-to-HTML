@@ -1,0 +1,19 @@
+---
+description: Always load project context from README.md, AGENTS.md, and VERSION.md before working
+alwaysApply: true
+---
+
+# Project context files
+
+Before answering or making changes in this repo, **read these three files** (use the Read tool if they are not already in context):
+
+1. `README.md` — product behavior, export mapping, UI, and development setup
+2. `AGENTS.md` — agent conventions, architecture, and commands
+3. `VERSION.md` — current version, changelog, and unreleased work
+
+## Rules
+
+- Treat these files as the source of truth for product scope, conventions, and version.
+- Prefer their guidance over assumptions when they conflict with memory from earlier chats.
+- After a release-worthy change, update `VERSION.md` (and `package.json` version) when the user asks to version or release.
+- Do not skip this step for “small” edits — export behavior and conventions live in these docs.
