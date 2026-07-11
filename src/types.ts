@@ -14,7 +14,9 @@ export type ExportResult = {
 
 export type ExportMessage =
   | { type: 'export' }
-  | { type: 'cancel' };
+  | { type: 'cancel' }
+  | { type: 'set-pref'; key: 'skipExportChecklist'; value: boolean }
+  | { type: 'get-prefs' };
 
 export type ExportNode = { html: string };
 

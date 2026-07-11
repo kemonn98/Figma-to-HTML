@@ -10,7 +10,7 @@ import {
   getPositionStylesRelativeToContainer,
   shouldAddRelativeStacking,
 } from '../styles/position';
-import { getClassForStyle, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
+import { assignStyleClasses, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
 import { decodeSvgBytes, normalizeSvgToNodeSize, registerSvgAsset, buildSvgImgHtml } from '../assets/svg';
 import { truncateLabel, reportExportProgress, overallPercentFromLayers } from '../export/progress';
 
@@ -287,8 +287,7 @@ export const convertText = async ({
 
       const textSplit = splitInlineVsClassStyles(inlineStyles);
       if (textSplit.classLines.length > 0) {
-        const vc = getClassForStyle(baseName || 'text', textSplit.classLines, context);
-        if (vc) classes.push(vc);
+        classes.push(...assignStyleClasses(baseName || 'text', textSplit.classLines, context));
       }
 
       if (classes.length === 0) {

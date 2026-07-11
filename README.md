@@ -31,9 +31,9 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 ## UI (ui.html)
 
 - **Header:** Title "Figma to Codes", version capsule, and short instructions.
-- **Export:** Opens a checklist modal (auto layout, assets, naming, clip tips); after **Continue export**, runs the export and shows a full-width status card (primary step + % in white, detail/filename in gray, 0–100% bar).
+- **Export:** Opens a checklist modal (auto layout, assets, naming, clip tips) unless dismissed via “Don’t show this again” (`figma.clientStorage`); info icon reopens guidelines. After **Continue export**, shows a full-width status card (primary step + % in white, detail/filename in gray, 0–100% bar).
 - **Download ZIP:** Builds a ZIP with HTML, CSS, and exported files under `assets/` (PNG images and SVG vectors; export first if needed). Filename: `figma-export.zip`.
-- **Output panels:** Tabs for **HTML**, **CSS**, and **Assets** (name + size list).
+- **Output panels:** Tabs for **HTML**, **CSS**, and **Assets** are visible on open (placeholders until export); then show code / asset list.
 - **Toasts:** Success/error only (e.g. "Export complete.", "Copied to clipboard.", "ZIP downloaded."); progress stays in the status card.
 
 The plugin UI is 370×600px.
@@ -67,7 +67,7 @@ Other node types are not converted.
 - **Markup:** HTML uses `class="..."` and `style="..."`. Positioning stays inline; shared visuals (fill, radius, shadow, color) prefer CSS classes via `styleMap`.
 - **Units:** Gap, padding, and font-size utilities use **rem** (`16px = 1rem`). Class names keep Figma px tokens (`gap-16`, `text-56`). Absolute `left`/`top`/fixed sizes stay **px**.
 - **Utility-style classes** (Tailwind-like): Flex, grid, gap, padding, justify, align, font size/weight, line-height, letter-spacing, font family, text align/transform/decoration, `flex-1`, `self-stretch`. Zero gap/padding utilities are omitted.
-- **Deduplication:** Same CSS signature reuses the same class via `styleMap`.
+- **Deduplication:** Same CSS signature reuses the same class via `styleMap`. Solid colors use a shared color library (`text-black-50`, `text-white-90`, `bg-white`, `bg-c-a3a3a3`) instead of the first layer name.
 - **Inline styles:** Positioning, transforms, overflow/clip-path, and one-off sizes.
 
 ### Layout mapping

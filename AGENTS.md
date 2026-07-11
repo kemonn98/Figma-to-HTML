@@ -22,7 +22,7 @@ Figma plugin that exports a selected **auto-layout or grid frame** to **HTML + C
 | `src/assets/` | Image/SVG asset registration |
 | `src/utils/` | Names, color/rem, HTML helpers |
 | `code.js` | Bundled output Figma loads (gitignored) — do not edit by hand |
-| `ui.html` | Plugin UI (export checklist modal, preview, HTML/CSS/Assets panels, ZIP, progress) |
+| `ui.html` | Plugin UI (checklist modal + info icon, always-visible HTML/CSS/Assets tabs, preview, ZIP, progress) |
 | `manifest.json` | Figma plugin manifest (`main: code.js`) |
 | `tsconfig.json` | Typecheck only (`noEmit`); includes `@figma/plugin-typings` |
 | `previews/html/` | Local HTML/CSS preview samples |
@@ -46,10 +46,10 @@ After changing anything under `src/`, always rebuild (`npm run build` or keep `w
 
 ## Architecture notes
 
-- UI ↔ plugin messaging: UI posts `{ type: 'export' }` or `{ type: 'cancel' }`; plugin posts `export-progress` (`message` + overall `percent` 0–100), `export-result`, or `error`.
+- UI ↔ plugin messaging: UI posts `{ type: 'export' }`, `{ type: 'cancel' }`, `{ type: 'get-prefs' }`, or `{ type: 'set-pref' }`; plugin posts `prefs`, `export-progress`, `export-result`, or `error`. “Don’t show again” uses `figma.clientStorage` (not UI `localStorage`).
 - Export entry: `exportSelection()` → recursive `nodeToHtmlCss(...)` in `src/convert/node.ts`.
 - Result includes `assets` (base64) for ZIP/`assets/` files; preview rewrites asset paths to data URLs.
-- Styling: utility classes (gap/padding/font-size in **rem**) + CSS classes for shared visuals; positioning stays inline.
+- Styling: utility classes (gap/padding/font-size in **rem**) + CSS classes for shared visuals; solid colors → color tokens (`text-black-50`, `bg-white`, `text-c-ff5500`) via `src/utils/color-tokens.ts`; positioning stays inline.
 - Icon fonts (including Font Awesome) → SVG file in `assets/` via `exportAsync` + `<img>` (no FA CDN in export).
 - Vectors export as `assets/*.svg` (referenced with `<img>`), not inlined markup; simple H/V dividers → CSS border.
 - Layer-derived CSS class names must not start with a digit (prefix `N…`).

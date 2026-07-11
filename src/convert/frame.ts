@@ -12,7 +12,7 @@ import {
   getPositionStylesRelativeToContainer,
   shouldAddRelativeStacking,
 } from '../styles/position';
-import { getClassForStyle, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
+import { getClassForStyle, assignStyleClasses, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
 import { hasImageFill, registerImageAsset } from '../assets/images';
 
 export const convertFrame = async ({
@@ -126,8 +126,7 @@ export const convertFrame = async ({
       inlineStyles.length = 0;
       inlineStyles.push(...keepInline);
       if (visualClassLines.length > 0) {
-        const visualClass = getClassForStyle(baseName || 'box', visualClassLines, context);
-        if (visualClass) classes.push(visualClass);
+        classes.push(...assignStyleClasses(baseName || 'box', visualClassLines, context));
       }
       if (styleLines.length > 0) {
         className = getClassForStyle(baseName, styleLines, context);

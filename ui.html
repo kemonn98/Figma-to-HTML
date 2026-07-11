@@ -23,13 +23,13 @@
 
   /* Centered initial view */
   .hero {
-    flex: 1;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 24px 20px;
-    min-height: 200px;
+    justify-content: flex-start;
+    padding: 24px 20px 8px;
+    min-height: 0;
   }
   .hero-inner {
     width: 100%;
@@ -95,6 +95,35 @@
   .btn-export svg { flex-shrink: 0; }
   .btn-export .fa { flex-shrink: 0; }
   .btn-export-text { display: inline-flex; align-items: center; gap: 8px; }
+
+  .export-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-export-info {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #737373;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+  }
+  .btn-export-info:hover {
+    background: transparent;
+    color: #e5e5e5;
+  }
+  .btn-export-info:focus-visible { outline: 2px solid #525252; outline-offset: 2px; }
+  .btn-export-info .fa { font-size: 14px; }
 
   /* Preview canvas – below export button */
   .preview-canvas-wrap {
@@ -281,27 +310,17 @@
     40% { transform: scale(1); opacity: 1; }
   }
 
-  /* Expandable code preview */
+  /* Code panels – always visible (placeholders until export) */
   .preview-wrapper {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.4s ease-out;
-    overflow: hidden;
-  }
-  .preview-wrapper.expanded {
-    grid-template-rows: 1fr;
+    display: block;
+    overflow: visible;
   }
   .preview-inner {
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
   }
   .output-section {
     padding: 0 16px 0 16px;
-    animation: fadeIn 0.35s ease-out;
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
   .code-view {
     border-radius: 10px;
@@ -391,9 +410,14 @@
     color: #d4d4d4;
   }
   .code-display:empty::before {
-    content: 'Exported code will appear here…';
     color: #525252;
     font-style: normal;
+  }
+  #output-display:empty::before {
+    content: 'HTML will appear here after export…';
+  }
+  #css-display:empty::before {
+    content: 'CSS will appear here after export…';
   }
   .code-area {
     position: absolute;
@@ -413,7 +437,7 @@
     list-style: none;
   }
   .assets-list:empty::before {
-    content: 'No assets exported yet…';
+    content: 'Assets will appear here after export…';
     color: #525252;
     font-size: 11px;
   }
@@ -642,6 +666,32 @@
     color: #fafafa;
   }
   .modal-btn-primary:hover { background: #0835ff; }
+
+  .modal-dismiss {
+    display: none;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0 16px 12px;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .modal-overlay.mode-export .modal-dismiss { display: flex; }
+  .modal-dismiss input {
+    margin: 2px 0 0;
+    flex-shrink: 0;
+    accent-color: #002beb;
+    cursor: pointer;
+  }
+  .modal-dismiss label {
+    font-size: 11px;
+    line-height: 1.4;
+    color: #a3a3a3;
+    cursor: pointer;
+    text-align: left;
+    user-select: none;
+  }
+  .modal-overlay.mode-guide .modal-btn-primary { display: none; }
+  .modal-overlay.mode-guide #export-checklist-cancel { flex: 1; }
 </style>
 
 <div class="container">
@@ -649,17 +699,22 @@
     <div class="hero-inner">
       <div class="hero-title">
         <h1>Figma to Codes</h1>
-        <span class="version-capsule" title="Plugin version">v1.5.2</span>
+        <span class="version-capsule" title="Plugin version">v1.5.3</span>
       </div>
       <p>Select an auto-layout frame, then export.</p>
-      <button type="button" id="export" class="btn-export">
-        <span class="btn-export-text"><i class="fa-solid fa-code" aria-hidden="true"></i>Export Selected Frames</span>
-        <span class="btn-export-dots" aria-hidden="true">
-          <span class="btn-export-dot"></span>
-          <span class="btn-export-dot"></span>
-          <span class="btn-export-dot"></span>
-        </span>
-      </button>
+      <div class="export-actions">
+        <button type="button" id="export" class="btn-export">
+          <span class="btn-export-text"><i class="fa-solid fa-code" aria-hidden="true"></i>Export Selected Frames</span>
+          <span class="btn-export-dots" aria-hidden="true">
+            <span class="btn-export-dot"></span>
+            <span class="btn-export-dot"></span>
+            <span class="btn-export-dot"></span>
+          </span>
+        </button>
+        <button type="button" id="export-guide-info" class="btn-export-info" title="Export guidelines" aria-label="Open export guidelines">
+          <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+        </button>
+      </div>
       <div id="export-status" class="export-status" aria-live="polite" aria-atomic="true">
         <div class="export-status-header">
           <p class="export-status-text" id="export-status-text">Exporting…</p>
@@ -773,6 +828,10 @@
           <span class="modal-tip-text"><strong>Select one root frame</strong> with auto layout or grid. Export one composition at a time for the best structure.</span>
         </li>
       </ul>
+    </div>
+    <div class="modal-dismiss">
+      <input type="checkbox" id="export-checklist-dont-show" />
+      <label for="export-checklist-dont-show">Don’t show this again before export</label>
     </div>
     <div class="modal-footer">
       <button type="button" class="modal-btn modal-btn-secondary" id="export-checklist-cancel">Cancel</button>
@@ -931,8 +990,8 @@
     if (!loading) clearExportStatus();
   }
 
-  function setPreviewExpanded(expanded) {
-    document.getElementById('preview-wrapper').classList.toggle('expanded', expanded);
+  function setPreviewExpanded(_expanded) {
+    /* Panels stay visible from first open; kept for call-site compatibility. */
   }
 
   function getPreviewContainerSize() {
@@ -1125,19 +1184,52 @@
     };
   });
 
-  function openExportChecklistModal() {
+  var exportChecklistMode = 'export';
+  /** Synced from figma.clientStorage (localStorage is unavailable in the plugin UI). */
+  var skipExportChecklist = false;
+
+  function isExportChecklistSkipped() {
+    return skipExportChecklist === true;
+  }
+
+  function setExportChecklistSkipped(skip) {
+    skipExportChecklist = !!skip;
+    parent.postMessage({
+      pluginMessage: {
+        type: 'set-pref',
+        key: 'skipExportChecklist',
+        value: skipExportChecklist,
+      },
+    }, '*');
+  }
+
+  function openExportChecklistModal(mode) {
     var overlay = document.getElementById('export-checklist-modal');
     if (!overlay) return;
+    exportChecklistMode = mode === 'guide' ? 'guide' : 'export';
+    overlay.classList.remove('mode-export', 'mode-guide');
+    overlay.classList.add(exportChecklistMode === 'guide' ? 'mode-guide' : 'mode-export');
     overlay.hidden = false;
     overlay.classList.add('visible');
+
+    var cancelBtn = document.getElementById('export-checklist-cancel');
     var confirmBtn = document.getElementById('export-checklist-confirm');
-    if (confirmBtn) confirmBtn.focus();
+    var dontShow = document.getElementById('export-checklist-dont-show');
+    if (dontShow) dontShow.checked = false;
+    if (cancelBtn) {
+      cancelBtn.textContent = exportChecklistMode === 'guide' ? 'Got it' : 'Cancel';
+    }
+    if (exportChecklistMode === 'guide') {
+      if (cancelBtn) cancelBtn.focus();
+    } else if (confirmBtn) {
+      confirmBtn.focus();
+    }
   }
 
   function closeExportChecklistModal() {
     var overlay = document.getElementById('export-checklist-modal');
     if (!overlay) return;
-    overlay.classList.remove('visible');
+    overlay.classList.remove('visible', 'mode-export', 'mode-guide');
     overlay.hidden = true;
   }
 
@@ -1150,7 +1242,15 @@
 
   document.getElementById('export').onclick = function() {
     if (document.getElementById('export').classList.contains('loading')) return;
-    openExportChecklistModal();
+    if (isExportChecklistSkipped()) {
+      startExport();
+      return;
+    }
+    openExportChecklistModal('export');
+  };
+
+  document.getElementById('export-guide-info').onclick = function() {
+    openExportChecklistModal('guide');
   };
 
   document.getElementById('export-checklist-cancel').onclick = function() {
@@ -1158,6 +1258,8 @@
   };
 
   document.getElementById('export-checklist-confirm').onclick = function() {
+    var dontShow = document.getElementById('export-checklist-dont-show');
+    if (dontShow && dontShow.checked) setExportChecklistSkipped(true);
     startExport();
   };
 
@@ -1173,6 +1275,9 @@
       closeExportChecklistModal();
     }
   });
+
+  // Ask main thread for prefs in case the initial prefs message was missed
+  parent.postMessage({ pluginMessage: { type: 'get-prefs' } }, '*');
 
   document.getElementById('download-zip').onclick = function() {
     var output = document.getElementById('output').value;
@@ -1219,6 +1324,10 @@
   onmessage = function(event) {
     var msg = event.data && event.data.pluginMessage;
     if (!msg || !msg.type) return;
+    if (msg.type === 'prefs') {
+      skipExportChecklist = msg.skipExportChecklist === true;
+      return;
+    }
     if (msg.type === 'export-progress') {
       setExportStatus(msg.message || 'Exporting…', msg.percent);
       return;

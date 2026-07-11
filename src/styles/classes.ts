@@ -1,5 +1,6 @@
 import type { ExportContext } from '../types';
 import { ensureValidCssClassName } from '../utils/names';
+import { colorLineToClassBase } from '../utils/color-tokens';
 
 export const getUniqueClassName = (base: string, context: ExportContext) => {
   const safeBase = ensureValidCssClassName(base);
@@ -54,6 +55,73 @@ export const getClassForStyle = (
     cssText: `.${className} {\n${lines.join('\n')}\n}\n\n`,
   });
   return className;
+};
+
+/**
+ * Register a single solid-color declaration as a shared color utility
+ * (`text-black-50`, `bg-white`, …). Returns null for non-color / gradient lines.
+ */
+export const registerColorStyleClass = (
+  line: string,
+  context: ExportContext
+): string | null => {
+  const classBase = colorLineToClassBase(line);
+  if (!classBase) return null;
+
+  const normalized = line.trim().replace(/;+\s*$/, '');
+  const propMatch = normalized.match(/^(color|background-color|background):\s*(.+)$/i);
+  if (!propMatch) return null;
+  const cssNormalized = `  ${propMatch[1].toLowerCase()}: ${propMatch[2].trim()};`;
+
+  const existing = context.styleMap.get(cssNormalized);
+  if (existing) return existing;
+
+  let className = ensureValidCssClassName(classBase);
+  const alreadyEntry = context.styleEntries.find((e) => e.className === className);
+  if (alreadyEntry) {
+    if (alreadyEntry.cssText === `.${className} {\n${cssNormalized}\n}\n\n`) {
+      context.styleMap.set(cssNormalized, className);
+      return className;
+    }
+    className = getUniqueClassName(classBase, context);
+  } else {
+    context.nameCounts.set(className, 1);
+  }
+
+  context.styleMap.set(cssNormalized, className);
+  if (!context.utilityClasses.has(className)) {
+    const { baseName, suffix } = getBaseNameAndSuffix(className);
+    context.utilityClasses.add(className);
+    context.styleEntries.push({
+      className,
+      baseName,
+      suffix,
+      cssText: `.${className} {\n${cssNormalized}\n}\n\n`,
+    });
+  }
+  return className;
+};
+
+/**
+ * Peel solid color lines into shared color utilities; remaining visuals keep layer-based names.
+ */
+export const assignStyleClasses = (
+  baseName: string,
+  lines: string[],
+  context: ExportContext
+): string[] => {
+  const classes: string[] = [];
+  const rest: string[] = [];
+  for (const line of lines) {
+    const colorClass = registerColorStyleClass(line, context);
+    if (colorClass) classes.push(colorClass);
+    else rest.push(line);
+  }
+  if (rest.length > 0) {
+    const visual = getClassForStyle(baseName, rest, context);
+    if (visual) classes.push(visual);
+  }
+  return classes;
 };
 
 /** Styles that are unique per node (positioning) stay inline; shared visuals go to CSS classes. */

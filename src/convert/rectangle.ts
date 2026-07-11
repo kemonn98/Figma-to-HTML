@@ -12,7 +12,7 @@ import {
   getPositionStylesRelativeToContainer,
   shouldAddRelativeStacking,
 } from '../styles/position';
-import { getUniqueClassName, getClassForStyle, splitInlineVsClassStyles } from '../styles/classes';
+import { getUniqueClassName, getClassForStyle, assignStyleClasses, splitInlineVsClassStyles } from '../styles/classes';
 import { hasImageFill, registerImageAsset } from '../assets/images';
 
 export const convertRectangle = async ({
@@ -144,8 +144,7 @@ export const convertRectangle = async ({
       const rectSplit = splitInlineVsClassStyles(inlineStyles);
       const rectInline = rectSplit.inline;
       if (rectSplit.classLines.length > 0) {
-        const vc = getClassForStyle(baseName || 'rect', rectSplit.classLines, context);
-        if (vc) classes.push(vc);
+        classes.push(...assignStyleClasses(baseName || 'rect', rectSplit.classLines, context));
       }
       if (rectImageSrc) {
         if (!rectInline.some((s) => s.startsWith('overflow:'))) rectInline.push('overflow: hidden');
