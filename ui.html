@@ -515,7 +515,7 @@
     <div class="hero-inner">
       <div class="hero-title">
         <h1>Figma to Codes</h1>
-        <span class="version-capsule" title="Plugin version">v1.5.0</span>
+        <span class="version-capsule" title="Plugin version">v1.5.1</span>
       </div>
       <p>Select an auto-layout frame, then export.</p>
       <button type="button" id="export" class="btn-export">
@@ -791,45 +791,13 @@
     return { html: outHtml, css: outCss };
   }
 
-  /**
-   * Preview-only: replace FA <i data-preview-fa> with SVG <img> so Pro icons
-   * render without a Pro CDN. Exported HTML/ZIP keep the original <i> tags.
-   */
-  function rewriteFaIconsForPreview(html, previewFaIcons) {
-    if (!html || !previewFaIcons || !previewFaIcons.length) return html || '';
-    var map = {};
-    for (var i = 0; i < previewFaIcons.length; i++) {
-      var icon = previewFaIcons[i];
-      if (icon && icon.id && icon.bytesBase64) map[icon.id] = icon;
-    }
-    return html.replace(/<i\b([^>]*\bdata-preview-fa=["']([^"']+)["'][^>]*)>\s*<\/i>/gi, function(_full, attrs, id) {
-      var icon = map[id];
-      if (!icon) return _full;
-      var dataUrl = 'data:image/svg+xml;base64,' + icon.bytesBase64;
-      var w = icon.width > 0 ? icon.width : 16;
-      var h = icon.height > 0 ? icon.height : 16;
-      var styleMatch = String(attrs).match(/\bstyle=["']([^"']*)["']/i);
-      var existing = styleMatch ? styleMatch[1].replace(/;?\s*$/, '') : '';
-      var style =
-        (existing ? existing + '; ' : '') +
-        'display: inline-block; width: ' + w + 'px; height: ' + h + 'px; ' +
-        'object-fit: contain; vertical-align: middle; flex-shrink: 0';
-      var layerMatch = String(attrs).match(/\bdata-layer=["']([^"']*)["']/i);
-      var layerAttr = layerMatch ? ' data-layer="' + layerMatch[1] + '"' : '';
-      return (
-        '<img' + layerAttr + ' data-preview-fa="' + id + '" src="' + dataUrl +
-        '" alt="" aria-hidden="true" style="' + style + '" />'
-      );
-    });
-  }
-
   function getPreviewBodyHtml(html) {
     if (!html) return '';
     var m = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
     return m ? m[1] : html;
   }
 
-  /** Pull FA / Google Fonts <link>s from export HTML so preview can render icons & type. */
+  /** Pull Google Fonts <link>s from export HTML so preview can render type. */
   function getPreviewHeadLinks(html) {
     var links = [];
     var seen = {};
@@ -843,14 +811,8 @@
       var m;
       while ((m = re.exec(html)) !== null) {
         var tag = m[0];
-        if (/font-awesome|fonts\.googleapis|fonts\.gstatic/i.test(tag)) add(tag);
+        if (/fonts\.googleapis|fonts\.gstatic/i.test(tag)) add(tag);
       }
-    }
-    var body = getPreviewBodyHtml(html);
-    var hasFaIcon = /\bclass\s*=\s*["'][^"']*\bfa-(solid|brands|regular|classic)\b/i.test(body)
-      || /\bclass\s*=\s*["'][^"']*\bfa-[a-z0-9-]+\b/i.test(body);
-    if (hasFaIcon && !links.some(function(l) { return /font-awesome/i.test(l); })) {
-      add('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">');
     }
     return links.join('');
   }
@@ -1033,9 +995,8 @@
       setPreviewExpanded(true);
       var assetMap = buildAssetDataUrlMap(lastExportAssets);
       var previewDocs = rewriteAssetUrls(outputEl.value, cssEl.value, assetMap);
-      var previewHtml = rewriteFaIconsForPreview(previewDocs.html, msg.previewFaIcons || []);
       updatePreviewCanvas(
-        previewHtml,
+        previewDocs.html,
         previewDocs.css,
         msg.frameWidth,
         msg.frameHeight

@@ -38,21 +38,23 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 
 ---
 
-## Logic and features (code.ts)
+## Logic and features (`src/`)
+
+Plugin logic lives under `src/` and is bundled to `code.js` with esbuild (`src/main.ts` entry).
 
 ### Export flow
 
 - The UI sends `{ type: 'export' }` to the plugin code.
-- The plugin calls `exportSelection()`, which checks that the selection is a single frame with auto-layout or grid (not `layoutMode === 'NONE'`), builds an **export context**, and runs the tree walk.
-- The tree is converted recursively with `nodeToHtmlCss(...)`.
-- Result: `{ html, css, frameWidth, frameHeight, assets }`. HTML is a full document (doctype, head, body, optional Google Fonts / Font Awesome CDN links, link to `styles.css`). Image fills are written as files under `assets/` and referenced by relative path. CSS is written to `styles.css`.
+- The plugin calls `exportSelection()` (`src/export/selection.ts`), which checks selection, builds an **export context**, and runs the tree walk.
+- The tree is converted recursively with `nodeToHtmlCss(...)` (`src/convert/node.ts`), which dispatches to per-type converters (`frame`, `group`, `text`, `rectangle`, `ellipse`, `vector`).
+- Result: `{ html, css, frameWidth, frameHeight, assets }`. HTML is a full document (doctype, head, body, optional Google Fonts links, link to `styles.css`). Image fills and icon/vector SVGs are written under `assets/` and referenced by relative path. CSS is written to `styles.css`.
 
 ### Node types supported
 
 | Figma node   | HTML element | What's exported |
 |-------------|-------------------|-----------------|
 | **Frame**   | `<div>`           | Auto-layout → flex; grid → CSS grid; sizing; solid/gradient fills; image fills → `assets/*.png` (`<img>` or `background-image`); corner radius; strokes; effects; opacity; blend; **Clip content** (`clipsContent`) → `overflow: hidden` (+ `clip-path` when rounded — required for masking); rotation; absolute children (parent `position: relative`). Root frame uses `width: 100%`, `max-width`, `min-height`, `margin-inline: auto`. Invisible spacers skipped. |
-| **Text**    | `<p>` or `<h1>` / `<i>` / `<img>` | Normal text → `<p>` (largest hero text ≥40px in top band → single `<h1>`). Font Awesome → `<i class="fa-solid\|fa-brands fa-…">` + CDN. Other icon fonts with short slug → `assets/*.svg` via `<img>`. Mixed fills → per-segment spans. |
+| **Text**    | `<p>` or `<h1>` / `<img>` | Normal text → `<p>` (largest hero text ≥40px in top band → single `<h1>`). Icon fonts (Font Awesome and others with short slug) → `assets/*.svg` via `<img>`. Mixed fills → per-segment spans. |
 | **Rectangle** | `<div>` (+ optional `<img>`) | Solid fill / image asset; corner radius; strokes; effects; sizing; position; rotation. |
 | **Vector / Line / Ellipse / Polygon / Star / Boolean operation** | `<div>` + `<img>` or border | Simple axis-aligned **LINE** / 2-point **VECTOR** dividers → CSS `border-top` / `border-left` (no SVG). Other shapes → `exportAsync` → `assets/*.svg`. |
 
@@ -100,9 +102,9 @@ Other node types are not converted.
 
 ### Output format
 
-- **HTML:** Full document with optional Google Fonts and Font Awesome 7 CDN (`all.min.css` when FA icons are used), link to `styles.css`, and body markup. Images reference `assets/<name>.png`.
+- **HTML:** Full document with optional Google Fonts, link to `styles.css`, and body markup. Images/icons reference `assets/<name>.png` / `assets/<name>.svg`.
 - **CSS:** `html { font-size: 16px; }`, `body, p, h1 { margin: 0; }`, then generated utility/component rules (rem for spacing and font-size).
-- **ZIP:** `index.html`, `styles.css`, and `assets/*` when images were exported.
+- **ZIP:** `index.html`, `styles.css`, and `assets/*` when images or SVGs were exported.
 
 ---
 
@@ -124,8 +126,11 @@ This plugin uses TypeScript and NPM.
    ```
 
 4. **Build**  
-   Compile `code.ts` to `code.js` (Figma runs the JS).  
-   In VS Code: **Terminal → Run Build Task…** → choose **npm: watch** so the JS is regenerated on save.
+   Bundle `src/main.ts` → `code.js` with esbuild (Figma runs the JS):
+   ```bash
+   npm run build
+   ```
+   Or `npm run watch` so the JS is regenerated on save.
 
 5. **UI dependency**  
    The UI loads JSZip from CDN (`https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js`) for the Download ZIP feature. No local install required.

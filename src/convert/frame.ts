@@ -1,0 +1,272 @@
+import type { ConvertParams, ExportNode } from '../types';
+import { roundPx, roundDim, isMeaningfulRotation, cssRotationDeg } from '../utils/color';
+import { getClassAttr, getStyleAttr } from '../utils/html';
+import { getFillStyle, getClipsContentStyles, getCornerRadiusStyle } from '../styles/fills';
+import { getStrokeStyles } from '../styles/strokes';
+import { getEffectsStyles, mapBlendMode } from '../styles/effects';
+import { isMaskNode, getClipPathFromMaskNode, getMaskImageStyles } from '../styles/mask';
+import { registerSizingUtilities, registerGridUtilities, registerFlexUtilities } from '../styles/layout';
+import {
+  getGroupChildPositionStyles,
+  getAbsolutePositionStyles,
+  getPositionStylesRelativeToContainer,
+  shouldAddRelativeStacking,
+} from '../styles/position';
+import { getClassForStyle, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
+import { hasImageFill, registerImageAsset } from '../assets/images';
+
+export const convertFrame = async ({
+  node,
+  context,
+  parentLayoutMode,
+  parentFrame,
+  parentGroup,
+  indent,
+  baseIndent,
+  positionContainer,
+  flattenedZIndex,
+  openPrefix,
+  closePrefix,
+  pascalName: _pascalName,
+  baseName,
+  dataLayer,
+  convertNode,
+}: ConvertParams): Promise<ExportNode> => {
+  let className = baseName;
+  let html = '';
+      const frame = node as FrameNode;
+      const isInvisibleSpacer =
+        frame.height < 1 &&
+        roundPx(frame.opacity) < 0.01 &&
+        frame.children.length === 0;
+      if (isInvisibleSpacer) {
+        return { html: '' };
+      }
+      const classes: string[] = [];
+      if (frame.layoutMode === 'GRID') {
+        classes.push(...registerGridUtilities(frame, context));
+      } else if (frame.layoutMode !== 'NONE') {
+        classes.push(...registerFlexUtilities(frame, context));
+      }
+      const sizing = registerSizingUtilities(frame, parentLayoutMode, context);
+      classes.push(...sizing.classes);
+
+      const styleLines: string[] = [];
+      const fill = getFillStyle(frame);
+      const inlineStyles = [...sizing.styles];
+      let hasPositioningTransform = false;
+      if (positionContainer) {
+        inlineStyles.push(...getPositionStylesRelativeToContainer(frame, positionContainer, flattenedZIndex));
+        hasPositioningTransform = true;
+      } else if (parentGroup) {
+        inlineStyles.push(...getGroupChildPositionStyles(frame, parentGroup));
+        hasPositioningTransform = true;
+      } else {
+        const absoluteStyles = getAbsolutePositionStyles(frame, parentFrame);
+        inlineStyles.push(...absoluteStyles);
+        hasPositioningTransform = absoluteStyles.length > 0;
+        if (shouldAddRelativeStacking(frame, parentFrame)) {
+          inlineStyles.push('position: relative');
+          const idx = parentFrame!.children.indexOf(frame);
+          const z = parentFrame!.itemReverseZIndex
+            ? parentFrame!.children.length - 1 - idx
+            : idx + 1;
+          inlineStyles.push(`z-index: ${z}`);
+        }
+      }
+      const isRoot = context.rootNode !== null && frame.id === context.rootNode.id;
+      let imageSrc: string | null = null;
+      if (!isMaskNode(frame)) {
+        if (fill) inlineStyles.push(`background: ${fill}`);
+        else if (hasImageFill(frame)) {
+          imageSrc = await registerImageAsset(frame, context);
+          if (imageSrc) {
+            if (frame.children.length > 0) {
+              inlineStyles.push(
+                `background-image: url("${imageSrc}")`,
+                'background-size: cover',
+                'background-position: center',
+                'background-repeat: no-repeat'
+              );
+              imageSrc = null; // used as background, not <img>
+            }
+          } else {
+            inlineStyles.push('background: #e5e7eb');
+          }
+        }
+      }
+      if (isRoot) {
+        // Replace fixed artboard width/height with responsive root constraints
+        for (let i = inlineStyles.length - 1; i >= 0; i--) {
+          if (inlineStyles[i].startsWith('width:') || inlineStyles[i].startsWith('height:')) {
+            inlineStyles.splice(i, 1);
+          }
+        }
+        inlineStyles.push(
+          'width: 100%',
+          `max-width: ${roundDim(frame.width)}px`,
+          'margin-inline: auto',
+          `min-height: ${roundDim(frame.height)}px`
+        );
+      }
+      const radius = getCornerRadiusStyle(frame);
+      if (radius) inlineStyles.push(radius);
+      inlineStyles.push(...getStrokeStyles(frame));
+      inlineStyles.push(...getEffectsStyles(frame));
+      if (frame.opacity < 1) inlineStyles.push(`opacity: ${roundPx(frame.opacity)}`);
+      const blend = 'blendMode' in frame ? mapBlendMode(frame.blendMode) : null;
+      if (blend && blend !== 'normal') inlineStyles.push(`mix-blend-mode: ${blend}`);
+      inlineStyles.push(...getClipsContentStyles(frame));
+      // Figma frame dimensions include padding; use border-box so width/height match
+      if (frame.layoutMode !== 'NONE') inlineStyles.push('box-sizing: border-box');
+      if (isMeaningfulRotation(frame.rotation) && !hasPositioningTransform) {
+        inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(frame.rotation)}deg)`);
+      }
+      const { inline: keepInline, classLines: visualClassLines } = splitInlineVsClassStyles(inlineStyles);
+      inlineStyles.length = 0;
+      inlineStyles.push(...keepInline);
+      if (visualClassLines.length > 0) {
+        const visualClass = getClassForStyle(baseName || 'box', visualClassLines, context);
+        if (visualClass) classes.push(visualClass);
+      }
+      if (styleLines.length > 0) {
+        className = getClassForStyle(baseName, styleLines, context);
+        if (className) classes.push(className);
+      }
+      if (classes.length === 0) {
+        // Avoid empty PascalCase class with no CSS — only add if we register a minimal rule
+        if (baseName && baseName !== 'frame') {
+          /* skip bare name */
+        } else {
+          context.usedBaseClasses.add(baseName);
+          if (baseName === 'frame') {
+            registerUtilityClass(baseName, ['  display: block;'], context);
+            classes.push(baseName);
+          }
+        }
+      }
+      if (
+        frame.layoutMode === 'NONE'
+          ? frame.children.length > 0
+          : frame.children.some(
+              (child) =>
+                'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE'
+            )
+      ) {
+        inlineStyles.push('position: relative');
+      }
+      const seen = new Set<string>();
+      const finalClasses = classes.filter((c) => {
+        if (seen.has(c)) return false;
+        seen.add(c);
+        return true;
+      });
+      const hasFlexDir = finalClasses.indexOf('flex-col') >= 0 || finalClasses.indexOf('flex-row') >= 0;
+      if (hasFlexDir && finalClasses.indexOf('flex') < 0) {
+        finalClasses.unshift('flex');
+      }
+      html += openPrefix + `<div ${dataLayer}${getClassAttr(finalClasses)}${getStyleAttr(inlineStyles)}>`;
+      if (imageSrc) {
+        const imgIndent = '  '.repeat(baseIndent + indent + 1);
+        html +=
+          '\n' +
+          imgIndent +
+          `<img src="${imageSrc}" alt="" style="display: block; width: 100%; height: 100%; object-fit: cover" />`;
+      }
+
+      const childParentLayoutMode =
+        frame.layoutMode === 'NONE' ? null : frame.layoutMode;
+      const childParentFrame =
+        frame.layoutMode === 'NONE' ? null : frame;
+      const childParentGroup =
+        frame.layoutMode === 'NONE' ? frame : null;
+      const frameChildren = Array.from(frame.children);
+      const runFrameChild = async (c: SceneNode, posContainer: SceneNode | null, z: number) => {
+        const out = await convertNode(
+          c,
+          context,
+          childParentLayoutMode,
+          childParentFrame,
+          childParentGroup,
+          indent + 1,
+          baseIndent,
+          posContainer,
+          z
+        );
+        return out.html;
+      };
+      let i = 0;
+      while (i < frameChildren.length) {
+        const child = frameChildren[i];
+        const isGroup = child.type === 'GROUP' || child.type === 'TRANSFORM_GROUP';
+        if (frame.layoutMode === 'NONE' && isGroup) {
+          const group = child as GroupNode;
+          const groupChildren = Array.from(group.children);
+          let j = 0;
+          while (j < groupChildren.length) {
+            const gc = groupChildren[j] as SceneNode;
+            if (isMaskNode(gc)) {
+              const clipPath = getClipPathFromMaskNode(gc);
+              let k = j + 1;
+              while (k < groupChildren.length && !isMaskNode(groupChildren[k] as SceneNode)) k++;
+              const maskedCount = k - j - 1;
+              html += await runFrameChild(gc, frame, j);
+              if (maskedCount > 0) {
+                const wrapperStyles: string[] = [
+                  `width: ${roundDim(gc.width)}px`,
+                  `height: ${roundDim(gc.height)}px`,
+                  'position: absolute',
+                  'overflow: hidden',
+                ];
+                if (clipPath) wrapperStyles.push(`clip-path: ${clipPath}`);
+                wrapperStyles.push(...getMaskImageStyles(gc));
+                wrapperStyles.push(...getPositionStylesRelativeToContainer(gc, frame, j + 1));
+                const innerIndent = '  '.repeat(baseIndent + indent + 1);
+                html += '\n' + innerIndent + `<div ${getClassAttr([])}${getStyleAttr(wrapperStyles)}>`;
+                for (let m = j + 1; m < k; m++) {
+                  html += await runFrameChild(groupChildren[m] as SceneNode, gc, m - j - 1);
+                }
+                html += '\n' + innerIndent + '</div>';
+              }
+              j = k;
+            } else {
+              html += await runFrameChild(gc, frame, j);
+              j++;
+            }
+          }
+          i++;
+        } else if (isMaskNode(child)) {
+          const clipPath = getClipPathFromMaskNode(child);
+          let k = i + 1;
+          while (k < frameChildren.length && !isMaskNode(frameChildren[k])) k++;
+          const maskedCount = k - i - 1;
+          html += await runFrameChild(child, null, 0);
+          if (maskedCount > 0) {
+            const wrapperStyles: string[] = [
+              `width: ${roundDim(child.width)}px`,
+              `height: ${roundDim(child.height)}px`,
+              'position: absolute',
+              'overflow: hidden',
+            ];
+            if (clipPath) wrapperStyles.push(`clip-path: ${clipPath}`);
+            wrapperStyles.push(...getMaskImageStyles(child));
+            const idx = i + 1;
+            const z = frame.itemReverseZIndex ? frameChildren.length - 1 - idx : idx + 1;
+            wrapperStyles.push(...getPositionStylesRelativeToContainer(child, frame, z));
+            const innerIndent = '  '.repeat(baseIndent + indent + 1);
+            html += '\n' + innerIndent + `<div ${getClassAttr([])}${getStyleAttr(wrapperStyles)}>`;
+            for (let m = i + 1; m < k; m++) {
+              html += await runFrameChild(frameChildren[m], child, m - i - 1);
+            }
+            html += '\n' + innerIndent + '</div>';
+          }
+          i = k;
+        } else {
+          html += await runFrameChild(child, null, 0);
+          i++;
+        }
+      }
+
+      html += closePrefix + `</div>`;
+  return { html };
+};

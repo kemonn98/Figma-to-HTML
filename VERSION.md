@@ -2,7 +2,7 @@
 
 Changelog and version history for **Figma to HTML** (Figma plugin: *Figma to Codes*).
 
-**Current version: `1.5.0`**
+**Current version: `1.5.1`**
 
 Source of truth for released history: commits on `main` → [kemonn98/Figma-to-HTML](https://github.com/kemonn98/Figma-to-HTML).  
 `package.json` should stay in sync with the version declared here.
@@ -22,6 +22,16 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 ## Unreleased
 
 _(none)_
+
+---
+
+## 1.5.1 — 2026-07-11
+
+**Commit:** _(pending)_
+
+- Icon fonts (including Font Awesome) export as `assets/*.svg` + `<img>`; remove Font Awesome CDN from export HTML/preview
+- Split plugin logic into `src/` modules; build with esbuild → `code.js`
+- Use `moduleResolution: "bundler"` in tsconfig (replace deprecated `node`)
 
 ---
 

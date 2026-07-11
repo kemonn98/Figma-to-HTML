@@ -3,11 +3,14 @@
     "target": "es6",
     "lib": ["es6"],
     "strict": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
     "typeRoots": [
       "./node_modules/@types",
       "./node_modules/@figma"
     ],
     "types": ["plugin-typings"]
   },
-  "include": ["*.ts"]
+  "include": ["src/**/*.ts"]
 }

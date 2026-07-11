@@ -76,7 +76,7 @@ git status
 ```
 
 - Push the current branch to `origin` (use `-u` only if upstream is missing).
-- Immediately run `npm run build` so `code.js` is regenerated from `code.ts` for Figma.
+- Immediately run `npm run build` so `code.js` is regenerated from `src/` for Figma.
 - Confirm: branch up to date with remote, **no uncommitted changes** (build output `code.js` is gitignored — that is expected).
 - Report to the user: new version, commit hash, push result, build result, clean status.
 
