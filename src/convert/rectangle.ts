@@ -12,7 +12,7 @@ import {
   getPositionStylesRelativeToContainer,
   shouldAddRelativeStacking,
 } from '../styles/position';
-import { getUniqueClassName, getClassForStyle, assignStyleClasses, splitInlineVsClassStyles } from '../styles/classes';
+import { getUniqueClassName, assignStyleClasses, splitInlineVsClassStyles } from '../styles/classes';
 import { hasImageFill, registerImageAsset } from '../assets/images';
 
 export const convertRectangle = async ({
@@ -32,7 +32,6 @@ export const convertRectangle = async ({
   dataLayer,
   convertNode: _convertNode,
 }: ConvertParams): Promise<ExportNode> => {
-  let className = baseName;
   let html = '';
       const rect = node as RectangleNode;
       const isInvisibleSpacer =
@@ -103,8 +102,7 @@ export const convertRectangle = async ({
         styleLines.push(`  border-radius: ${roundDim(rect.cornerRadius)}px;`);
       }
       if (styleLines.length > 0) {
-        className = getClassForStyle(baseName, styleLines, context);
-        if (className) classes.push(className);
+        classes.push(...assignStyleClasses(baseName || 'rect', styleLines, context));
       }
       const sizing = registerSizingUtilities(rect, parentLayoutMode, context);
       classes.push(...sizing.classes);

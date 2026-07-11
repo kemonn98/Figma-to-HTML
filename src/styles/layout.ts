@@ -1,5 +1,5 @@
 import type { ExportContext } from '../types';
-import { pxToRem, roundDim } from '../utils/color';
+import { pxToRem, snapPx, roundDim } from '../utils/color';
 import { formatNegativeClassValue } from '../utils/names';
 import { registerUtilityClass } from './classes';
 
@@ -193,10 +193,11 @@ export const registerGridUtilities = (frame: FrameNode, context: ExportContext):
   registerUtilityClass(rowsClass, [`  grid-template-rows: repeat(${rows}, minmax(0, 1fr));`], context);
   registerUtilityClass(colsClass, [`  grid-template-columns: repeat(${cols}, minmax(0, 1fr));`], context);
   classes.push(rowsClass, colsClass);
-  const gapValue = formatNegativeClassValue(frame.itemSpacing);
-  if (frame.itemSpacing !== 0) {
+  const gapSnapped = snapPx(frame.itemSpacing);
+  if (gapSnapped !== 0) {
+    const gapValue = formatNegativeClassValue(gapSnapped);
     const gapClass = `gap-${gapValue}`;
-    registerUtilityClass(gapClass, [`  gap: ${pxToRem(frame.itemSpacing)};`], context);
+    registerUtilityClass(gapClass, [`  gap: ${pxToRem(gapSnapped)};`], context);
     classes.push(gapClass);
   }
   return classes;
@@ -227,14 +228,17 @@ export const registerFlexUtilities = (
     }
     const counterSpacing = frame.counterAxisSpacing ?? frame.itemSpacing;
     if (counterSpacing != null && counterSpacing > 0) {
-      if (frame.layoutMode === 'HORIZONTAL') {
-        const rowGapClass = `row-gap-${formatNegativeClassValue(counterSpacing)}`;
-        registerUtilityClass(rowGapClass, [`  row-gap: ${pxToRem(counterSpacing)};`], context);
-        classes.push(rowGapClass);
-      } else {
-        const colGapClass = `column-gap-${formatNegativeClassValue(counterSpacing)}`;
-        registerUtilityClass(colGapClass, [`  column-gap: ${pxToRem(counterSpacing)};`], context);
-        classes.push(colGapClass);
+      const snapped = snapPx(counterSpacing);
+      if (snapped > 0) {
+        if (frame.layoutMode === 'HORIZONTAL') {
+          const rowGapClass = `row-gap-${formatNegativeClassValue(snapped)}`;
+          registerUtilityClass(rowGapClass, [`  row-gap: ${pxToRem(snapped)};`], context);
+          classes.push(rowGapClass);
+        } else {
+          const colGapClass = `column-gap-${formatNegativeClassValue(snapped)}`;
+          registerUtilityClass(colGapClass, [`  column-gap: ${pxToRem(snapped)};`], context);
+          classes.push(colGapClass);
+        }
       }
     }
   }
@@ -242,62 +246,71 @@ export const registerFlexUtilities = (
   // When SPACE_BETWEEN, Figma distributes space—don't add fixed gap (handles AUTO spacing)
   const isAutoGap = frame.primaryAxisAlignItems === 'SPACE_BETWEEN';
   if (!isAutoGap && frame.itemSpacing !== 0) {
-    const gapValue = formatNegativeClassValue(frame.itemSpacing);
-    const gapClass = `gap-${gapValue}`;
-    registerUtilityClass(gapClass, [`  gap: ${pxToRem(frame.itemSpacing)};`], context);
-    classes.push(gapClass);
+    const snapped = snapPx(frame.itemSpacing);
+    if (snapped !== 0) {
+      const gapValue = formatNegativeClassValue(snapped);
+      const gapClass = `gap-${gapValue}`;
+      registerUtilityClass(gapClass, [`  gap: ${pxToRem(snapped)};`], context);
+      classes.push(gapClass);
+    }
   }
 
   const { paddingTop, paddingRight, paddingBottom, paddingLeft } = frame;
+  const snapPad = {
+    t: snapPx(paddingTop),
+    r: snapPx(paddingRight),
+    b: snapPx(paddingBottom),
+    l: snapPx(paddingLeft),
+  };
   const allSame =
-    paddingTop === paddingRight &&
-    paddingTop === paddingBottom &&
-    paddingTop === paddingLeft;
+    snapPad.t === snapPad.r &&
+    snapPad.t === snapPad.b &&
+    snapPad.t === snapPad.l;
 
   if (allSame) {
-    if (paddingTop !== 0) {
-      const padValue = formatNegativeClassValue(paddingTop);
+    if (snapPad.t !== 0) {
+      const padValue = formatNegativeClassValue(snapPad.t);
       const padClass = `p-${padValue}`;
       registerUtilityClass(
         padClass,
-        [`  padding: ${pxToRem(paddingTop)};`],
+        [`  padding: ${pxToRem(snapPad.t)};`],
         context
       );
       classes.push(padClass);
     }
   } else {
-    if (paddingTop !== 0) {
-      const value = formatNegativeClassValue(paddingTop);
+    if (snapPad.t !== 0) {
+      const value = formatNegativeClassValue(snapPad.t);
       const className = `pt-${value}`;
-      registerUtilityClass(className, [`  padding-top: ${pxToRem(paddingTop)};`], context);
+      registerUtilityClass(className, [`  padding-top: ${pxToRem(snapPad.t)};`], context);
       classes.push(className);
     }
-    if (paddingRight !== 0) {
-      const value = formatNegativeClassValue(paddingRight);
+    if (snapPad.r !== 0) {
+      const value = formatNegativeClassValue(snapPad.r);
       const className = `pr-${value}`;
       registerUtilityClass(
         className,
-        [`  padding-right: ${pxToRem(paddingRight)};`],
+        [`  padding-right: ${pxToRem(snapPad.r)};`],
         context
       );
       classes.push(className);
     }
-    if (paddingBottom !== 0) {
-      const value = formatNegativeClassValue(paddingBottom);
+    if (snapPad.b !== 0) {
+      const value = formatNegativeClassValue(snapPad.b);
       const className = `pb-${value}`;
       registerUtilityClass(
         className,
-        [`  padding-bottom: ${pxToRem(paddingBottom)};`],
+        [`  padding-bottom: ${pxToRem(snapPad.b)};`],
         context
       );
       classes.push(className);
     }
-    if (paddingLeft !== 0) {
-      const value = formatNegativeClassValue(paddingLeft);
+    if (snapPad.l !== 0) {
+      const value = formatNegativeClassValue(snapPad.l);
       const className = `pl-${value}`;
       registerUtilityClass(
         className,
-        [`  padding-left: ${pxToRem(paddingLeft)};`],
+        [`  padding-left: ${pxToRem(snapPad.l)};`],
         context
       );
       classes.push(className);
@@ -307,7 +320,7 @@ export const registerFlexUtilities = (
   const justifyClass = (() => {
     switch (frame.primaryAxisAlignItems) {
       case 'MIN':
-        return 'justify-start';
+        return null; // default flex-start — omit
       case 'MAX':
         return 'justify-end';
       case 'CENTER':
@@ -315,20 +328,22 @@ export const registerFlexUtilities = (
       case 'SPACE_BETWEEN':
         return 'justify-between';
       default:
-        return 'justify-start';
+        return null;
     }
   })();
-  registerUtilityClass(
-    justifyClass,
-    [`  justify-content: ${mapPrimaryAxis(frame.primaryAxisAlignItems)};`],
-    context
-  );
-  classes.push(justifyClass);
+  if (justifyClass) {
+    registerUtilityClass(
+      justifyClass,
+      [`  justify-content: ${mapPrimaryAxis(frame.primaryAxisAlignItems)};`],
+      context
+    );
+    classes.push(justifyClass);
+  }
 
   const itemsClass = (() => {
     switch (frame.counterAxisAlignItems) {
       case 'MIN':
-        return 'items-start';
+        return null; // default flex-start — omit
       case 'MAX':
         return 'items-end';
       case 'CENTER':
@@ -339,12 +354,14 @@ export const registerFlexUtilities = (
         return 'items-stretch';
     }
   })();
-  registerUtilityClass(
-    itemsClass,
-    [`  align-items: ${mapCounterAxis(frame.counterAxisAlignItems)};`],
-    context
-  );
-  classes.push(itemsClass);
+  if (itemsClass) {
+    registerUtilityClass(
+      itemsClass,
+      [`  align-items: ${mapCounterAxis(frame.counterAxisAlignItems)};`],
+      context
+    );
+    classes.push(itemsClass);
+  }
 
   return classes;
 };

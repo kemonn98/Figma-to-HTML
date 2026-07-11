@@ -49,7 +49,8 @@ After changing anything under `src/`, always rebuild (`npm run build` or keep `w
 - UI ↔ plugin messaging: UI posts `{ type: 'export' }`, `{ type: 'cancel' }`, `{ type: 'get-prefs' }`, or `{ type: 'set-pref' }`; plugin posts `prefs`, `export-progress`, `export-result`, or `error`. “Don’t show again” uses `figma.clientStorage` (not UI `localStorage`).
 - Export entry: `exportSelection()` → recursive `nodeToHtmlCss(...)` in `src/convert/node.ts`.
 - Result includes `assets` (base64) for ZIP/`assets/` files; preview rewrites asset paths to data URLs.
-- Styling: utility classes (gap/padding/font-size in **rem**) + CSS classes for shared visuals; solid colors → color tokens (`text-black-50`, `bg-white`, `text-c-ff5500`) via `src/utils/color-tokens.ts`; positioning stays inline.
+- Styling: utility classes (gap/padding snapped to **4px** then **rem**; font-size in rem) + shared tokens (`text-black-50`, `opacity-60`, `rounded-8`, `shadow-inset-1-white-10`, `bg-grad-*` / `text-grad-*` via `color-tokens` / `style-tokens`); omit defaults (`justify-start`, `items-start`, `text-left`, `font-400`, `tracking-0`); positioning stays inline. Absolute nodes keep `position: absolute` (do not overwrite with relative for containing block). Base CSS resets heading UA bold/size.
+- Skip invisible nodes (`visible === false` or `opacity < 0.01`); skip empty mask sources; semantic tags for Button/Link layers and h2/h3 size bands (`src/convert/semantics.ts`).
 - Icon fonts (including Font Awesome) → SVG file in `assets/` via `exportAsync` + `<img>` (no FA CDN in export).
 - Vectors export as `assets/*.svg` (referenced with `<img>`), not inlined markup; simple H/V dividers → CSS border.
 - Layer-derived CSS class names must not start with a digit (prefix `N…`).
@@ -79,7 +80,7 @@ Order: inspect diffs → bump `VERSION.md` + `package.json` → update `README.m
 8. **clipsContent:** always emit `overflow: hidden` (and matching `clip-path` when the frame has corner radius). Do not skip clipping for layer blur — Clip content is required for frame masking.
 9. **HTML + CSS only** — no React/JSX export path.
 10. **Images and SVGs** go to `assets/` in the ZIP; do not leave `#e5e7eb` placeholders when `getImageByHash` succeeds; do not inline SVG markup.
-11. **Spacing/font-size** utilities use `pxToRem` (base 16).
+11. **Spacing** utilities use `snapPx(4)` then `pxToRem` (base 16). Font-size uses `pxToRem` without snap.
 
 ## When changing export behavior
 

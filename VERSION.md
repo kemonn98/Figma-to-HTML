@@ -2,7 +2,7 @@
 
 Changelog and version history for **Figma to HTML** (Figma plugin: *Figma to Codes*).
 
-**Current version: `1.5.3`**
+**Current version: `1.5.4`**
 
 Source of truth for released history: commits on `main` → [kemonn98/Figma-to-HTML](https://github.com/kemonn98/Figma-to-HTML).  
 `package.json` should stay in sync with the version declared here.
@@ -21,7 +21,20 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 
 ## Unreleased
 
-_(none)_
+---
+
+## 1.5.4 — 2026-07-11
+
+**Commit:** _(pending)_
+
+- Style tokens: `opacity-*`, `rounded-*` / `rounded-full`, `shadow-inset-*`, `bg-grad-*`, `text-grad-*` (shared utilities, not layer names)
+- Omit default utilities: `justify-start`, `items-start`, `text-left`, `font-400`, `tracking-0`
+- Skip `visible === false` and `opacity < 0.01` nodes; no `opacity-0` classes
+- Snap gap/padding to 4px grid before rem tokens
+- Skip empty mask source nodes (wrapper only); omit default `.group` utility on passthrough groups
+- Semantic hints: layer `Button`/`Link` → `<button>`/`<a href="#">`; text ≥32px → `h2`, ≥24px → `h3` (hero still `h1`)
+- Fix: absolute frames keep `position: absolute` (do not overwrite with `relative` for containing block)
+- Fix: reset UA `font-weight`/`font-size` on `h1`–`h3` so omitted `font-400` matches Figma
 
 ---
 

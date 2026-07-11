@@ -1,6 +1,7 @@
 import type { ExportContext } from '../types';
 import { ensureValidCssClassName } from '../utils/names';
 import { colorLineToClassBase } from '../utils/color-tokens';
+import { peelGradientTextBlock, styleLineToToken } from '../utils/style-tokens';
 
 export const getUniqueClassName = (base: string, context: ExportContext) => {
   const safeBase = ensureValidCssClassName(base);
@@ -57,6 +58,43 @@ export const getClassForStyle = (
   return className;
 };
 
+/** Register a preferred utility class name for a CSS signature (color / style tokens). */
+export const registerNamedStyleClass = (
+  classBase: string,
+  cssLines: string[],
+  context: ExportContext
+): string => {
+  const signature = cssLines.join('\n');
+  const existing = context.styleMap.get(signature);
+  if (existing) return existing;
+
+  let className = ensureValidCssClassName(classBase);
+  const alreadyEntry = context.styleEntries.find((e) => e.className === className);
+  const expectedCss = `.${className} {\n${signature}\n}\n\n`;
+  if (alreadyEntry) {
+    if (alreadyEntry.cssText === expectedCss) {
+      context.styleMap.set(signature, className);
+      return className;
+    }
+    className = getUniqueClassName(classBase, context);
+  } else {
+    context.nameCounts.set(className, 1);
+  }
+
+  context.styleMap.set(signature, className);
+  if (!context.utilityClasses.has(className)) {
+    const { baseName, suffix } = getBaseNameAndSuffix(className);
+    context.utilityClasses.add(className);
+    context.styleEntries.push({
+      className,
+      baseName,
+      suffix,
+      cssText: `.${className} {\n${signature}\n}\n\n`,
+    });
+  }
+  return className;
+};
+
 /**
  * Register a single solid-color declaration as a shared color utility
  * (`text-black-50`, `bg-white`, …). Returns null for non-color / gradient lines.
@@ -72,38 +110,11 @@ export const registerColorStyleClass = (
   const propMatch = normalized.match(/^(color|background-color|background):\s*(.+)$/i);
   if (!propMatch) return null;
   const cssNormalized = `  ${propMatch[1].toLowerCase()}: ${propMatch[2].trim()};`;
-
-  const existing = context.styleMap.get(cssNormalized);
-  if (existing) return existing;
-
-  let className = ensureValidCssClassName(classBase);
-  const alreadyEntry = context.styleEntries.find((e) => e.className === className);
-  if (alreadyEntry) {
-    if (alreadyEntry.cssText === `.${className} {\n${cssNormalized}\n}\n\n`) {
-      context.styleMap.set(cssNormalized, className);
-      return className;
-    }
-    className = getUniqueClassName(classBase, context);
-  } else {
-    context.nameCounts.set(className, 1);
-  }
-
-  context.styleMap.set(cssNormalized, className);
-  if (!context.utilityClasses.has(className)) {
-    const { baseName, suffix } = getBaseNameAndSuffix(className);
-    context.utilityClasses.add(className);
-    context.styleEntries.push({
-      className,
-      baseName,
-      suffix,
-      cssText: `.${className} {\n${cssNormalized}\n}\n\n`,
-    });
-  }
-  return className;
+  return registerNamedStyleClass(classBase, [cssNormalized], context);
 };
 
 /**
- * Peel solid color lines into shared color utilities; remaining visuals keep layer-based names.
+ * Peel solid colors + style tokens into shared utilities; leftovers keep layer-based names.
  */
 export const assignStyleClasses = (
   baseName: string,
@@ -111,11 +122,29 @@ export const assignStyleClasses = (
   context: ExportContext
 ): string[] => {
   const classes: string[] = [];
+  const { token: gradText, rest: afterGradText } = peelGradientTextBlock(lines);
+  if (gradText) {
+    classes.push(registerNamedStyleClass(gradText.classBase, gradText.cssLines, context));
+  }
+
   const rest: string[] = [];
-  for (const line of lines) {
+  for (const line of afterGradText) {
     const colorClass = registerColorStyleClass(line, context);
-    if (colorClass) classes.push(colorClass);
-    else rest.push(line);
+    if (colorClass) {
+      classes.push(colorClass);
+      continue;
+    }
+    const styleToken = styleLineToToken(line);
+    if (styleToken) {
+      // opacityLineToClassBase returns null for ~0; styleLineToToken skips those
+      classes.push(
+        registerNamedStyleClass(styleToken.classBase, styleToken.cssLines, context)
+      );
+      continue;
+    }
+    // Drop bare opacity ≈ 0 lines instead of layer-naming them
+    if (/^\s*opacity:\s*0(\.0+)?\s*;?\s*$/i.test(line.trim())) continue;
+    rest.push(line);
   }
   if (rest.length > 0) {
     const visual = getClassForStyle(baseName, rest, context);

@@ -6,7 +6,7 @@ import { exportSelection } from './export/selection';
 const SKIP_EXPORT_CHECKLIST_KEY = 'skipExportChecklist';
 
 figma.showUI(__html__);
-figma.ui.resize(370, 600);
+figma.ui.resize(370, 520);
 
 const sendPrefsToUi = async () => {
   const skip = (await figma.clientStorage.getAsync(SKIP_EXPORT_CHECKLIST_KEY)) === true;

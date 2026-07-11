@@ -6,6 +6,10 @@ export const isAbsoluteChild = (node: SceneNode, parentFrame: FrameNode | null) 
   'layoutPositioning' in node &&
   node.layoutPositioning === 'ABSOLUTE';
 
+/** True if styles already set a non-static position (absolute creates a containing block). */
+export const hasPositionedStyle = (styles: string[]): boolean =>
+  styles.some((s) => /^position:\s*(absolute|fixed|relative|sticky)\b/i.test(s));
+
 /** Position styles for children of a Group. Group children use explicit x,y (and optional constraints). */
 export const getGroupChildPositionStyles = (
   node: SceneNode,

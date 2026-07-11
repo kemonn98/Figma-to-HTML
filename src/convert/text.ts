@@ -11,6 +11,7 @@ import {
   shouldAddRelativeStacking,
 } from '../styles/position';
 import { assignStyleClasses, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
+import { textHeadingTag } from './semantics';
 import { decodeSvgBytes, normalizeSvgToNodeSize, registerSvgAsset, buildSvgImgHtml } from '../assets/svg';
 import { truncateLabel, reportExportProgress, overallPercentFromLayers } from '../export/progress';
 
@@ -57,7 +58,7 @@ export const getFontWeightFromStyle = (fontName: TextNode['fontName']) => {
 export const getTextAlignClass = (align: TextNode['textAlignHorizontal']) => {
   switch (align) {
     case 'LEFT':
-      return 'text-left';
+      return null; // default — omit
     case 'CENTER':
       return 'text-center';
     case 'RIGHT':
@@ -127,7 +128,7 @@ export const convertText = async ({
       }
 
       const fontWeight = getFontWeightFromStyle(text.fontName);
-      if (fontWeight) {
+      if (fontWeight && fontWeight !== 400) {
         const weightClass = `font-${fontWeight}`;
         registerUtilityClass(weightClass, [`  font-weight: ${fontWeight};`], context);
         classes.push(weightClass);
@@ -147,16 +148,19 @@ export const convertText = async ({
 
       if (text.letterSpacing !== figma.mixed) {
         const value = text.letterSpacing.value;
-        const trackingClass = `tracking-${formatNegativeClassValue(Math.round(value))}`;
-        const cssValue = text.letterSpacing.unit === 'PERCENT'
-          ? `${value / 100}em`
-          : `${Math.round(value)}px`;
-        registerUtilityClass(
-          trackingClass,
-          [`  letter-spacing: ${cssValue};`],
-          context
-        );
-        classes.push(trackingClass);
+        const rounded = Math.round(value);
+        if (rounded !== 0) {
+          const trackingClass = `tracking-${formatNegativeClassValue(rounded)}`;
+          const cssValue = text.letterSpacing.unit === 'PERCENT'
+            ? `${value / 100}em`
+            : `${rounded}px`;
+          registerUtilityClass(
+            trackingClass,
+            [`  letter-spacing: ${cssValue};`],
+            context
+          );
+          classes.push(trackingClass);
+        }
       }
 
       if (text.fontName !== figma.mixed && !shouldExportTextAsIconSvg(text)) {
@@ -294,7 +298,10 @@ export const convertText = async ({
         registerUtilityClass('text', [], context);
         classes.push('text');
       }
-      const tag = context.heroHeadingNodeId === text.id ? 'h1' : 'p';
+      const tag = textHeadingTag(
+        fontSize,
+        context.heroHeadingNodeId === text.id
+      );
       html +=
         openPrefix +
         `<${tag} ${dataLayer}${getClassAttr(classes)}${getStyleAttr(textSplit.inline)}>${textContent}</${tag}>`;

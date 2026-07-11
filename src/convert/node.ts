@@ -92,6 +92,9 @@ export const nodeToHtmlCss: ConvertNodeFn = async (
   if (node.visible === false) {
     return { html: '' };
   }
+  if ('opacity' in node && typeof node.opacity === 'number' && node.opacity < 0.01) {
+    return { html: '' };
+  }
 
   tickNodeProgress(context, node);
 

@@ -55,8 +55,8 @@ Plugin logic lives under `src/` and is bundled to `code.js` with esbuild (`src/m
 
 | Figma node   | HTML element | What's exported |
 |-------------|-------------------|-----------------|
-| **Frame**   | `<div>`           | Auto-layout → flex; grid → CSS grid; sizing; solid/gradient fills; image fills → `assets/*.png` (`<img>` or `background-image`); corner radius; strokes; effects; opacity; blend; **Clip content** (`clipsContent`) → `overflow: hidden` (+ `clip-path` when rounded — required for masking); rotation; absolute children (parent `position: relative`). Root frame uses `width: 100%`, `max-width`, `min-height`, `margin-inline: auto`. Invisible spacers skipped. |
-| **Text**    | `<p>` or `<h1>` / `<img>` | Normal text → `<p>` (largest hero text ≥40px in top band → single `<h1>`). Icon fonts (Font Awesome and others with short slug) → `assets/*.svg` via `<img>`. Mixed fills → per-segment spans. |
+| **Frame**   | `<div>` / `<button>` / `<a>` | Auto-layout → flex; grid → CSS grid; sizing; fills; image fills → `assets/*.png`; radius/strokes/effects; **Clip content**; rotation; absolute children. Layer names matching Button/Btn/CTA → `<button type="button">`; Link → `<a href="#">`. Root: `width: 100%`, `max-width`, `min-height`. |
+| **Text**    | `<p>` / `<h1>`–`<h3>` / `<img>` | Hero large text in top band → `<h1>`; else ≥32px → `<h2>`, ≥24px → `<h3>`, else `<p>`. Icon fonts → `assets/*.svg` via `<img>`. Mixed fills → per-segment spans. |
 | **Rectangle** | `<div>` (+ optional `<img>`) | Solid fill / image asset; corner radius; strokes; effects; sizing; position; rotation. |
 | **Vector / Line / Ellipse / Polygon / Star / Boolean operation** | `<div>` + `<img>` or border | Simple axis-aligned **LINE** / 2-point **VECTOR** dividers → CSS `border-top` / `border-left` (no SVG). Other shapes → `exportAsync` → `assets/*.svg`. |
 
@@ -65,10 +65,11 @@ Other node types are not converted.
 ### Styling approach
 
 - **Markup:** HTML uses `class="..."` and `style="..."`. Positioning stays inline; shared visuals (fill, radius, shadow, color) prefer CSS classes via `styleMap`.
-- **Units:** Gap, padding, and font-size utilities use **rem** (`16px = 1rem`). Class names keep Figma px tokens (`gap-16`, `text-56`). Absolute `left`/`top`/fixed sizes stay **px**.
-- **Utility-style classes** (Tailwind-like): Flex, grid, gap, padding, justify, align, font size/weight, line-height, letter-spacing, font family, text align/transform/decoration, `flex-1`, `self-stretch`. Zero gap/padding utilities are omitted.
-- **Deduplication:** Same CSS signature reuses the same class via `styleMap`. Solid colors use a shared color library (`text-black-50`, `text-white-90`, `bg-white`, `bg-c-a3a3a3`) instead of the first layer name.
+- **Units:** Gap and padding snap to a **4px** grid, then use **rem** (`16px = 1rem`). Font-size utilities stay unsnapped. Class names keep px tokens (`gap-16`, `text-56`). Absolute `left`/`top`/fixed sizes stay **px**.
+- **Utility-style classes** (Tailwind-like): Flex, grid, gap, padding, justify/align (non-defaults only), font size/weight (omit `font-400`), line-height, letter-spacing (omit `tracking-0`), font family, text align (omit `text-left`), `flex-1`, `self-stretch`.
+- **Deduplication:** Same CSS signature reuses the same class via `styleMap`. Shared tokens: colors (`text-black-50`, `bg-white`), `opacity-*`, `rounded-*`, `shadow-inset-*`, `bg-grad-*` / `text-grad-*` — not the first layer’s name.
 - **Inline styles:** Positioning, transforms, overflow/clip-path, and one-off sizes.
+- **Skipped:** `visible === false`, `opacity < 0.01`, empty mask source nodes (mask wrapper kept).
 
 ### Layout mapping
 
@@ -83,8 +84,9 @@ Other node types are not converted.
   - When `layoutSizingHorizontal` / `layoutSizingVertical` exist: **FILL** → `flex-1` (primary) or `self-stretch` (counter); **FIXED** gets explicit width/height.  
   - Otherwise: `layoutGrow > 0` → `flex-1`; `layoutAlign === 'STRETCH'` → `self-stretch`. Text and rectangle get width/height when they don’t fill.  
   - Frames with auto-layout use primary/counter axis sizing mode when not using explicit layoutSizing*.
-- **Absolute positioning**  
-  - If any child has absolute positioning, the parent frame gets `position: relative`.  
+- **Absolute positioning**
+  - Absolute children keep `position: absolute` (constraints → `left`/`top`/`right`/`bottom` / center transforms).
+  - Parents that need a containing block get `position: relative` only if they are not already positioned (`absolute` already creates a containing block).
   - Absolute child’s `z-index` is set from its index in the parent’s children array.  
   - Constraints (min/max/center/stretch) on horizontal and vertical map to `left`/`right`/`top`/`bottom` and, for center, `transform: translateX(-50%)` / `translateY(-50%)` with optional pixel offset.  
   - Rotation is added to `transform` when non-zero.
@@ -105,7 +107,7 @@ Other node types are not converted.
 ### Output format
 
 - **HTML:** Full document with optional Google Fonts, link to `styles.css`, and body markup. Images/icons reference `assets/<name>.png` / `assets/<name>.svg`.
-- **CSS:** `html { font-size: 16px; }`, `body, p, h1 { margin: 0; }`, then generated utility/component rules (rem for spacing and font-size).
+- **CSS:** `html { font-size: 16px; }`, margin reset on `body`/`p`/`h1`–`h3`, and `h1, h2, h3 { font-size: inherit; font-weight: inherit; }` so UA bold/size do not override Figma (omitted `font-400`), then generated utility/component rules.
 - **ZIP:** `index.html`, `styles.css`, and `assets/*` when images or SVGs were exported.
 
 ---

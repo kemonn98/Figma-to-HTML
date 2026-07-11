@@ -64,7 +64,9 @@ export const exportSelection = async (): Promise<ExportResult> => {
     .join('&');
   const css =
     `html { font-size: ${REM_BASE}px; }\n` +
-    `body, p, h1 { margin: 0; }\n\n` +
+    `body, p, h1, h2, h3 { margin: 0; }\n` +
+    // Neutralize UA heading bold/size so Figma weight/size classes win (font-400 is omitted).
+    `h1, h2, h3 { font-size: inherit; font-weight: inherit; }\n\n` +
     context.styleEntries
       .sort((a, b) => {
         const baseCompare = a.baseName.localeCompare(b.baseName);

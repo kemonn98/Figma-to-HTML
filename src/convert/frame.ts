@@ -11,9 +11,11 @@ import {
   getAbsolutePositionStyles,
   getPositionStylesRelativeToContainer,
   shouldAddRelativeStacking,
+  hasPositionedStyle,
 } from '../styles/position';
-import { getClassForStyle, assignStyleClasses, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
+import { assignStyleClasses, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
 import { hasImageFill, registerImageAsset } from '../assets/images';
+import { semanticContainerTag, semanticContainerOpenAttrs } from './semantics';
 
 export const convertFrame = async ({
   node,
@@ -32,7 +34,6 @@ export const convertFrame = async ({
   dataLayer,
   convertNode,
 }: ConvertParams): Promise<ExportNode> => {
-  let className = baseName;
   let html = '';
       const frame = node as FrameNode;
       const isInvisibleSpacer =
@@ -51,7 +52,6 @@ export const convertFrame = async ({
       const sizing = registerSizingUtilities(frame, parentLayoutMode, context);
       classes.push(...sizing.classes);
 
-      const styleLines: string[] = [];
       const fill = getFillStyle(frame);
       const inlineStyles = [...sizing.styles];
       let hasPositioningTransform = false;
@@ -128,10 +128,6 @@ export const convertFrame = async ({
       if (visualClassLines.length > 0) {
         classes.push(...assignStyleClasses(baseName || 'box', visualClassLines, context));
       }
-      if (styleLines.length > 0) {
-        className = getClassForStyle(baseName, styleLines, context);
-        if (className) classes.push(className);
-      }
       if (classes.length === 0) {
         // Avoid empty PascalCase class with no CSS — only add if we register a minimal rule
         if (baseName && baseName !== 'frame') {
@@ -144,13 +140,16 @@ export const convertFrame = async ({
           }
         }
       }
+      // Containing block for absolute children — skip if already positioned
+      // (absolute/fixed already create a containing block; relative would overwrite absolute).
       if (
-        frame.layoutMode === 'NONE'
+        !hasPositionedStyle(inlineStyles) &&
+        (frame.layoutMode === 'NONE'
           ? frame.children.length > 0
           : frame.children.some(
               (child) =>
                 'layoutPositioning' in child && child.layoutPositioning === 'ABSOLUTE'
-            )
+            ))
       ) {
         inlineStyles.push('position: relative');
       }
@@ -164,7 +163,9 @@ export const convertFrame = async ({
       if (hasFlexDir && finalClasses.indexOf('flex') < 0) {
         finalClasses.unshift('flex');
       }
-      html += openPrefix + `<div ${dataLayer}${getClassAttr(finalClasses)}${getStyleAttr(inlineStyles)}>`;
+      const tag = semanticContainerTag(node.name || baseName || '');
+      const tagAttrs = semanticContainerOpenAttrs(tag);
+      html += openPrefix + `<${tag} ${tagAttrs}${dataLayer}${getClassAttr(finalClasses)}${getStyleAttr(inlineStyles)}>`;
       if (imageSrc) {
         const imgIndent = '  '.repeat(baseIndent + indent + 1);
         html +=
@@ -209,7 +210,7 @@ export const convertFrame = async ({
               let k = j + 1;
               while (k < groupChildren.length && !isMaskNode(groupChildren[k] as SceneNode)) k++;
               const maskedCount = k - j - 1;
-              html += await runFrameChild(gc, frame, j);
+              // Skip empty mask source node; only emit the masked wrapper
               if (maskedCount > 0) {
                 const wrapperStyles: string[] = [
                   `width: ${roundDim(gc.width)}px`,
@@ -239,7 +240,7 @@ export const convertFrame = async ({
           let k = i + 1;
           while (k < frameChildren.length && !isMaskNode(frameChildren[k])) k++;
           const maskedCount = k - i - 1;
-          html += await runFrameChild(child, null, 0);
+          // Skip empty mask source node; only emit the masked wrapper
           if (maskedCount > 0) {
             const wrapperStyles: string[] = [
               `width: ${roundDim(child.width)}px`,
@@ -266,6 +267,6 @@ export const convertFrame = async ({
         }
       }
 
-      html += closePrefix + `</div>`;
+      html += closePrefix + `</${tag}>`;
   return { html };
 };

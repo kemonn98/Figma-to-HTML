@@ -1,5 +1,11 @@
 export const REM_BASE = 16;
 
+/** Snap to a spacing grid (default 4px) for gap/padding tokens. */
+export const snapPx = (px: number, grid = 4): number => {
+  if (!Number.isFinite(px) || px === 0) return 0;
+  return Math.round(px / grid) * grid;
+};
+
 export const pxToRem = (px: number): string => {
   if (!Number.isFinite(px) || px === 0) return '0';
   const rem = px / REM_BASE;
