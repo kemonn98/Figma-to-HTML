@@ -35,6 +35,7 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 - **Download ZIP:** Builds a ZIP with HTML, CSS, and exported files under `assets/` (PNG images and SVG vectors; export first if needed). Filename: `figma-export.zip`.
 - **Output panels:** Tabs for **HTML**, **CSS**, and **Assets** are visible on open (placeholders until export); then show code / asset list.
 - **Toasts:** Success/error only (e.g. "Export complete.", "Copied to clipboard.", "ZIP downloaded."); progress stays in the status card.
+- **Footer:** “Plugin by SlabPixel” with SlabPixel linking to https://slabpixel.com.
 
 The plugin UI is 370×600px.
 
@@ -56,7 +57,7 @@ Plugin logic lives under `src/` and is bundled to `code.js` with esbuild (`src/m
 | Figma node   | HTML element | What's exported |
 |-------------|-------------------|-----------------|
 | **Frame**   | `<div>` / `<button>` / `<a>` | Auto-layout → flex; grid → CSS grid; sizing; fills; image fills → `assets/*.png`; radius/strokes/effects; **Clip content**; rotation; absolute children. Layer names matching Button/Btn/CTA → `<button type="button">`; Link → `<a href="#">`. Root: `width: 100%`, `max-width`, `min-height`. |
-| **Text**    | `<p>` / `<h1>`–`<h3>` / `<img>` | Hero large text in top band → `<h1>`; else ≥32px → `<h2>`, ≥24px → `<h3>`, else `<p>`. Icon fonts → `assets/*.svg` via `<img>`. Mixed fills → per-segment spans. |
+| **Text**    | `<p>` / `<img>` | All text → `<p>`. Icon fonts → `assets/*.svg` via `<img>`. Mixed fills → per-segment spans. |
 | **Rectangle** | `<div>` (+ optional `<img>`) | Solid fill / image asset; corner radius; strokes; effects; sizing; position; rotation. |
 | **Vector / Line / Ellipse / Polygon / Star / Boolean operation** | `<div>` + `<img>` or border | Simple axis-aligned **LINE** / 2-point **VECTOR** dividers → CSS `border-top` / `border-left` (no SVG). Other shapes → `exportAsync` → `assets/*.svg`. |
 
@@ -66,8 +67,9 @@ Other node types are not converted.
 
 - **Markup:** HTML uses `class="..."` and `style="..."`. Positioning stays inline; shared visuals (fill, radius, shadow, color) prefer CSS classes via `styleMap`.
 - **Units:** Gap and padding snap to a **4px** grid, then use **rem** (`16px = 1rem`). Font-size utilities stay unsnapped. Class names keep px tokens (`gap-16`, `text-56`). Absolute `left`/`top`/fixed sizes stay **px**.
-- **Utility-style classes** (Tailwind-like): Flex, grid, gap, padding, justify/align (non-defaults only), font size/weight (omit `font-400`), line-height, letter-spacing (omit `tracking-0`), font family, text align (omit `text-left`), `flex-1`, `self-stretch`.
+- **Utility-style classes** (Tailwind-like): Flex, grid, gap, padding, justify (omit `justify-start`), align-items including `items-start` (CSS default is stretch), font size/weight (omit `font-400`), line-height, letter-spacing (omit `tracking-0`), font family, text align (omit `text-left`), `flex-1`, `self-stretch`.
 - **Deduplication:** Same CSS signature reuses the same class via `styleMap`. Shared tokens: colors (`text-black-50`, `bg-white`), `opacity-*`, `rounded-*`, `shadow-inset-*`, `bg-grad-*` / `text-grad-*` — not the first layer’s name.
+- **Linear gradients:** Invert `gradientTransform` to get handle start/end in the node box, compute CSS angle, then remap Figma stop positions onto the CSS gradient line (stops may be outside 0–100% when handles don’t span the full box).
 - **Inline styles:** Positioning, transforms, overflow/clip-path, and one-off sizes.
 - **Skipped:** `visible === false`, `opacity < 0.01`, empty mask source nodes (mask wrapper kept).
 
@@ -107,7 +109,7 @@ Other node types are not converted.
 ### Output format
 
 - **HTML:** Full document with optional Google Fonts, link to `styles.css`, and body markup. Images/icons reference `assets/<name>.png` / `assets/<name>.svg`.
-- **CSS:** `html { font-size: 16px; }`, margin reset on `body`/`p`/`h1`–`h3`, and `h1, h2, h3 { font-size: inherit; font-weight: inherit; }` so UA bold/size do not override Figma (omitted `font-400`), then generated utility/component rules.
+- **CSS:** `html { font-size: 16px; }`, `body, p { margin: 0; }`, then generated utility/component rules.
 - **ZIP:** `index.html`, `styles.css`, and `assets/*` when images or SVGs were exported.
 
 ---

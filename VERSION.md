@@ -2,7 +2,7 @@
 
 Changelog and version history for **Figma to HTML** (Figma plugin: *Figma to Codes*).
 
-**Current version: `1.5.4`**
+**Current version: `1.5.5`**
 
 Source of truth for released history: commits on `main` → [kemonn98/Figma-to-HTML](https://github.com/kemonn98/Figma-to-HTML).  
 `package.json` should stay in sync with the version declared here.
@@ -20,6 +20,17 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 ---
 
 ## Unreleased
+
+---
+
+## 1.5.5 — 2026-07-11
+
+**Commit:** _(pending)_
+
+- All text nodes export as `<p>` (no `h1`–`h4` / hero heading detection)
+- Linear gradients: map Figma handle start/end (via inverse `gradientTransform`) onto the CSS gradient line so custom positions remap stop % (not angle-only)
+- Fix: emit `items-start` for counter-axis MIN (Top/Left) — CSS `align-items` defaults to stretch, not flex-start
+- Plugin UI footer: “Plugin by SlabPixel” with link to slabpixel.com
 
 ---
 

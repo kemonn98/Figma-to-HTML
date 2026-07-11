@@ -43,7 +43,6 @@ export type ExportContext = {
   imageHashToFile: Map<string, string>;
   rootNode: SceneNode | null;
   rootHeight: number;
-  heroHeadingNodeId: string | null;
   isRootPass: boolean;
   progressDone: number;
   progressTotal: number;

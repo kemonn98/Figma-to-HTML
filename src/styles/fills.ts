@@ -77,7 +77,147 @@ export const gradientStopsToCss = (stops: ReadonlyArray<{ position: number; colo
   return parts.join(', ');
 };
 
-/** Linear: transform gives start (tx,ty) and direction (a,c). CSS angle: 0deg=to top, 90deg=to right. Flip +180 to match Figma. */
+type GradPoint = { x: number; y: number };
+
+const EPS = 1e-8;
+
+/** Invert Figma 2×3 affine transform (as 3×3 with bottom row [0,0,1]). */
+const invertTransform = (t: Transform): Transform | null => {
+  const a = t[0][0];
+  const b = t[0][1];
+  const tx = t[0][2];
+  const c = t[1][0];
+  const d = t[1][1];
+  const ty = t[1][2];
+  const det = a * d - b * c;
+  if (Math.abs(det) < EPS) return null;
+  const invDet = 1 / det;
+  return [
+    [d * invDet, -b * invDet, (b * ty - d * tx) * invDet],
+    [-c * invDet, a * invDet, (c * tx - a * ty) * invDet],
+  ];
+};
+
+const applyTransform = (t: Transform, x: number, y: number): GradPoint => ({
+  x: t[0][0] * x + t[0][1] * y + t[0][2],
+  y: t[1][0] * x + t[1][1] * y + t[1][2],
+});
+
+/**
+ * Figma gradientTransform maps object space → gradient space.
+ * Invert it and map identity handles (0,0.5)→(1,0.5) to get start/end in normalized object space.
+ */
+export const extractLinearGradientHandles = (
+  t: Transform,
+  width: number,
+  height: number
+): { start: GradPoint; end: GradPoint } | null => {
+  const inv = invertTransform(t);
+  if (!inv) return null;
+  const sn = applyTransform(inv, 0, 0.5);
+  const en = applyTransform(inv, 1, 0.5);
+  return {
+    start: { x: sn.x * width, y: sn.y * height },
+    end: { x: en.x * width, y: en.y * height },
+  };
+};
+
+/** CSS angle: 0deg = to top, 90deg = to right (clockwise). */
+const cssAngleFromPoints = (start: GradPoint, end: GradPoint): number => {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (Math.abs(dx) < EPS && Math.abs(dy) < EPS) return 0;
+  // atan2: 0 = right; CSS 0 = top → add 90
+  let deg = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+  deg = ((deg % 360) + 360) % 360;
+  return deg === 360 ? 0 : deg;
+};
+
+/** CSS Images: gradient line length for a box at a given CSS angle. */
+const cssGradientLineLength = (width: number, height: number, cssAngleDeg: number): number => {
+  const rad = (cssAngleDeg * Math.PI) / 180;
+  return Math.abs(width * Math.sin(rad)) + Math.abs(height * Math.cos(rad));
+};
+
+const cssGradientLineEndpoints = (
+  width: number,
+  height: number,
+  cssAngleDeg: number,
+  length: number
+): { cssStart: GradPoint; cssEnd: GradPoint } => {
+  const center = { x: width / 2, y: height / 2 };
+  // Math angle: 0 = right (CSS angle − 90°)
+  const mathRad = ((cssAngleDeg - 90) * Math.PI) / 180;
+  const half = length / 2;
+  const ux = Math.cos(mathRad);
+  const uy = Math.sin(mathRad);
+  return {
+    cssStart: { x: center.x - half * ux, y: center.y - half * uy },
+    cssEnd: { x: center.x + half * ux, y: center.y + half * uy },
+  };
+};
+
+const projectOntoLine = (point: GradPoint, lineStart: GradPoint, lineEnd: GradPoint): GradPoint => {
+  const lx = lineEnd.x - lineStart.x;
+  const ly = lineEnd.y - lineStart.y;
+  const lenSq = lx * lx + ly * ly;
+  if (lenSq < EPS) return { ...lineStart };
+  const t =
+    ((point.x - lineStart.x) * lx + (point.y - lineStart.y) * ly) / lenSq;
+  return { x: lineStart.x + t * lx, y: lineStart.y + t * ly };
+};
+
+const formatStopPct = (position: number): string => {
+  const pct = Math.round(position * 10000) / 100;
+  if (Math.abs(pct - Math.round(pct)) < 0.005) return `${Math.round(pct)}%`;
+  return `${pct}%`;
+};
+
+/**
+ * Convert Figma linear gradient to CSS, remapping stops onto the CSS gradient line
+ * so custom handle positions (not just rotation) are preserved.
+ */
+export const linearGradientToCss = (
+  g: FigmaGradientPaint,
+  width: number,
+  height: number
+): string => {
+  const w = Math.max(width, EPS);
+  const h = Math.max(height, EPS);
+  const handles = extractLinearGradientHandles(g.gradientTransform, w, h);
+  if (!handles || !g.gradientStops.length) {
+    const fallbackStops = gradientStopsToCss(g.gradientStops);
+    if (!fallbackStops) return '';
+    return `linear-gradient(${gradientTransformToLinearCss(g.gradientTransform)}, ${fallbackStops})`;
+  }
+
+  const { start, end } = handles;
+  const angle = cssAngleFromPoints(start, end);
+  const lineLen = cssGradientLineLength(w, h, angle);
+  if (lineLen < EPS) {
+    const c = g.gradientStops[0].color;
+    return toCssColor(c.r, c.g, c.b, 'a' in c ? c.a : 1);
+  }
+  const { cssStart, cssEnd } = cssGradientLineEndpoints(w, h, angle, lineLen);
+  const cssVx = cssEnd.x - cssStart.x;
+  const cssVy = cssEnd.y - cssStart.y;
+  const cssLenSq = cssVx * cssVx + cssVy * cssVy;
+
+  const mapped = g.gradientStops.map((stop) => {
+    const px = start.x + (end.x - start.x) * stop.position;
+    const py = start.y + (end.y - start.y) * stop.position;
+    const projected = projectOntoLine({ x: px, y: py }, cssStart, cssEnd);
+    const pvx = projected.x - cssStart.x;
+    const pvy = projected.y - cssStart.y;
+    const signed = (pvx * cssVx + pvy * cssVy) / cssLenSq;
+    const color = toCssColor(stop.color.r, stop.color.g, stop.color.b, 'a' in stop.color ? stop.color.a : 1);
+    return `${color} ${formatStopPct(signed)}`;
+  });
+
+  return `linear-gradient(${Math.round(angle)}deg, ${mapped.join(', ')})`;
+};
+
+/** Linear fallback: direction only (no custom handle remapping). */
 export const gradientTransformToLinearCss = (t: Transform): string => {
   const a = t[0][0];
   const c = t[1][0];
@@ -113,32 +253,41 @@ export const gradientTransformToConicCss = (t: Transform): string => {
   return `from ${normalized}deg at ${cx}% ${cy}%`;
 };
 
-export const paintToCssBackground = (paint: SolidPaint | FigmaGradientPaint): string => {
+export type GradientSize = { width: number; height: number };
+
+const nodeGradientSize = (node: { width?: number; height?: number }): GradientSize => ({
+  width: typeof node.width === 'number' && node.width > 0 ? node.width : 100,
+  height: typeof node.height === 'number' && node.height > 0 ? node.height : 100,
+});
+
+export const paintToCssBackground = (
+  paint: SolidPaint | FigmaGradientPaint,
+  size?: GradientSize
+): string => {
   if (paint.type === 'SOLID') {
     const p = paint as SolidPaint;
     return toCssColor(p.color.r, p.color.g, p.color.b, p.opacity ?? 1);
   }
   const g = paint as FigmaGradientPaint;
   if (g.visible === false) return '';
-  const stops = gradientStopsToCss(g.gradientStops);
-  if (!stops) return '';
-  const t = g.gradientTransform;
+  const dim = size ?? { width: 100, height: 100 };
   switch (g.type) {
-    case 'GRADIENT_LINEAR': {
-      const angle = gradientTransformToLinearCss(t);
-      return `linear-gradient(${angle}, ${stops})`;
-    }
+    case 'GRADIENT_LINEAR':
+      return linearGradientToCss(g, dim.width, dim.height);
     case 'GRADIENT_RADIAL': {
-      const shape = gradientTransformToRadialCss(t);
-      return `radial-gradient(${shape}, ${stops})`;
+      const stops = gradientStopsToCss(g.gradientStops);
+      if (!stops) return '';
+      return `radial-gradient(${gradientTransformToRadialCss(g.gradientTransform)}, ${stops})`;
     }
     case 'GRADIENT_ANGULAR': {
-      const from = gradientTransformToConicCss(t);
-      return `conic-gradient(${from}, ${stops})`;
+      const stops = gradientStopsToCss(g.gradientStops);
+      if (!stops) return '';
+      return `conic-gradient(${gradientTransformToConicCss(g.gradientTransform)}, ${stops})`;
     }
     case 'GRADIENT_DIAMOND': {
-      const shape = gradientTransformToRadialCss(t);
-      return `radial-gradient(${shape}, ${stops})`;
+      const stops = gradientStopsToCss(g.gradientStops);
+      if (!stops) return '';
+      return `radial-gradient(${gradientTransformToRadialCss(g.gradientTransform)}, ${stops})`;
     }
     default:
       return '';
@@ -150,6 +299,7 @@ export const getFillStyle = (node: GeometryMixin): string | null => {
   if (!('fills' in node) || node.fills === figma.mixed) return null;
   const fill = node.fills.find((p) => p.visible !== false) as SolidPaint | FigmaGradientPaint | undefined;
   if (!fill) return null;
+  const size = nodeGradientSize(node as { width?: number; height?: number });
   if (fill.type === 'SOLID') return paintToCssBackground(fill as SolidPaint);
   if (
     fill.type === 'GRADIENT_LINEAR' ||
@@ -157,13 +307,16 @@ export const getFillStyle = (node: GeometryMixin): string | null => {
     fill.type === 'GRADIENT_ANGULAR' ||
     fill.type === 'GRADIENT_DIAMOND'
   ) {
-    return paintToCssBackground(fill as FigmaGradientPaint);
+    return paintToCssBackground(fill as FigmaGradientPaint, size);
   }
   return null;
 };
 
 /** First visible fill from paints array (e.g. text segment). */
-export const getFillStyleFromPaints = (paints: ReadonlyArray<Paint>): string | null => {
+export const getFillStyleFromPaints = (
+  paints: ReadonlyArray<Paint>,
+  size?: GradientSize
+): string | null => {
   const fill = paints.find((p) => p.visible !== false) as SolidPaint | FigmaGradientPaint | undefined;
   if (!fill) return null;
   if (fill.type === 'SOLID') return paintToCssBackground(fill as SolidPaint);
@@ -173,7 +326,7 @@ export const getFillStyleFromPaints = (paints: ReadonlyArray<Paint>): string | n
     fill.type === 'GRADIENT_ANGULAR' ||
     fill.type === 'GRADIENT_DIAMOND'
   ) {
-    return paintToCssBackground(fill as FigmaGradientPaint);
+    return paintToCssBackground(fill as FigmaGradientPaint, size);
   }
   return null;
 };

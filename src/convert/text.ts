@@ -11,7 +11,6 @@ import {
   shouldAddRelativeStacking,
 } from '../styles/position';
 import { assignStyleClasses, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
-import { textHeadingTag } from './semantics';
 import { decodeSvgBytes, normalizeSvgToNodeSize, registerSvgAsset, buildSvgImgHtml } from '../assets/svg';
 import { truncateLabel, reportExportProgress, overallPercentFromLayers } from '../export/progress';
 
@@ -256,7 +255,7 @@ export const convertText = async ({
             .map((segment) => {
               const paints = segment.fills as ReadonlyArray<Paint>;
               const segmentFill = Array.isArray(paints)
-                ? getFillStyleFromPaints(paints)
+                ? getFillStyleFromPaints(paints, { width: text.width, height: text.height })
                 : null;
               const segmentText = textToHtml(segment.characters);
               if (!segmentFill) return segmentText;
@@ -268,7 +267,7 @@ export const convertText = async ({
             })
             .join('');
         } catch {
-          const textFill = getSolidTextFill(text) || getFillStyleFromPaints((text.fills as unknown) as ReadonlyArray<Paint>);
+          const textFill = getSolidTextFill(text) || getFillStyleFromPaints((text.fills as unknown) as ReadonlyArray<Paint>, { width: text.width, height: text.height });
           if (textFill) {
             const isGradient = /^(linear|radial|conic)-gradient\(/.test(textFill);
             if (isGradient) inlineStyles.push(`background: ${textFill}`, 'color: transparent', 'background-clip: text', '-webkit-background-clip: text');
@@ -276,7 +275,7 @@ export const convertText = async ({
           }
         }
       } else {
-        const textFill = getSolidTextFill(text) || getFillStyleFromPaints(text.fills as ReadonlyArray<Paint>);
+        const textFill = getSolidTextFill(text) || getFillStyleFromPaints(text.fills as ReadonlyArray<Paint>, { width: text.width, height: text.height });
         if (textFill) {
           const isGradient = /^(linear|radial|conic)-gradient\(/.test(textFill);
           if (isGradient) inlineStyles.push(`background: ${textFill}`, 'color: transparent', 'background-clip: text', '-webkit-background-clip: text');
@@ -298,12 +297,8 @@ export const convertText = async ({
         registerUtilityClass('text', [], context);
         classes.push('text');
       }
-      const tag = textHeadingTag(
-        fontSize,
-        context.heroHeadingNodeId === text.id
-      );
       html +=
         openPrefix +
-        `<${tag} ${dataLayer}${getClassAttr(classes)}${getStyleAttr(textSplit.inline)}>${textContent}</${tag}>`;
+        `<p ${dataLayer}${getClassAttr(classes)}${getStyleAttr(textSplit.inline)}>${textContent}</p>`;
   return { html };
 };

@@ -512,6 +512,28 @@
   .btn-download:hover { background: #333; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
   .btn-download:focus-visible { outline: 2px solid #525252; outline-offset: 2px; }
 
+  .plugin-credit {
+    padding: 0 16px 16px;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #525252;
+  }
+  .plugin-credit a {
+    color: #a3a3a3;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .plugin-credit a:hover {
+    color: #e5e5e5;
+    text-decoration: underline;
+  }
+  .plugin-credit a:focus-visible {
+    outline: 2px solid #525252;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
   .toast {
     position: fixed;
     bottom: 16px;
@@ -699,7 +721,7 @@
     <div class="hero-inner">
       <div class="hero-title">
         <h1>Figma to Codes</h1>
-        <span class="version-capsule" title="Plugin version">v1.5.4</span>
+        <span class="version-capsule" title="Plugin version">v1.5.5</span>
       </div>
       <p>Select an auto-layout frame, then export.</p>
       <div class="export-actions">
@@ -791,6 +813,9 @@
           Download ZIP
         </button>
       </footer>
+      <p class="plugin-credit">
+        Plugin by <a href="https://slabpixel.com" target="_blank" rel="noopener noreferrer">SlabPixel</a>
+      </p>
     </div>
   </div>
 </div>

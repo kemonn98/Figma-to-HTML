@@ -22,12 +22,15 @@ export const getStrokePaint = (node: GeometryMixin): SolidPaint | FigmaGradientP
 };
 
 /** CSS value for stroke paint (color string or gradient). */
-export const strokePaintToCss = (paint: SolidPaint | FigmaGradientPaint): string => {
+export const strokePaintToCss = (
+  paint: SolidPaint | FigmaGradientPaint,
+  size?: { width: number; height: number }
+): string => {
   if (paint.type === 'SOLID') {
     const { r, g, b } = paint.color;
     return toCssColor(r, g, b, paint.opacity ?? 1);
   }
-  return paintToCssBackground(paint as FigmaGradientPaint);
+  return paintToCssBackground(paint as FigmaGradientPaint, size);
 };
 
 /** Whether the node has a dashed stroke (dashPattern / strokeDashes). Plugin API may use strokeDashes. */
@@ -64,7 +67,11 @@ export const getStrokeStyles = (node: GeometryMixin): string[] => {
   const isDashed = dashPattern !== null && dashPattern.length > 0;
 
   const isGradient = stroke.type !== 'SOLID';
-  const strokeCss = strokePaintToCss(stroke);
+  const size =
+    'width' in node && 'height' in node
+      ? { width: (node as { width: number }).width, height: (node as { height: number }).height }
+      : undefined;
+  const strokeCss = strokePaintToCss(stroke, size);
 
   if (isGradient) {
     // Gradient stroke: use border-image (position is effectively center). Note: border-image ignores border-radius in CSS.

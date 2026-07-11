@@ -343,7 +343,8 @@ export const registerFlexUtilities = (
   const itemsClass = (() => {
     switch (frame.counterAxisAlignItems) {
       case 'MIN':
-        return null; // default flex-start — omit
+        // CSS align-items defaults to stretch — must emit flex-start for Figma Top/Left
+        return 'items-start';
       case 'MAX':
         return 'items-end';
       case 'CENTER':

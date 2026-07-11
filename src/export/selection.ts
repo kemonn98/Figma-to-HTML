@@ -2,7 +2,7 @@ import type { ExportAsset, ExportContext, ExportResult } from '../types';
 import { REM_BASE } from '../utils/color';
 import { uint8ToBase64 } from '../utils/html';
 import { isFontAwesomeFamily } from '../convert/text';
-import { findHeroHeadingNodeId, nodeToHtmlCss } from '../convert/node';
+import { nodeToHtmlCss } from '../convert/node';
 import {
   reportExportProgress,
   countExportableNodes,
@@ -44,7 +44,6 @@ export const exportSelection = async (): Promise<ExportResult> => {
     imageHashToFile: new Map<string, string>(),
     rootNode,
     rootHeight: rootNode.height,
-    heroHeadingNodeId: findHeroHeadingNodeId(rootNode),
     isRootPass: true,
     progressDone: 0,
     progressTotal,
@@ -64,9 +63,7 @@ export const exportSelection = async (): Promise<ExportResult> => {
     .join('&');
   const css =
     `html { font-size: ${REM_BASE}px; }\n` +
-    `body, p, h1, h2, h3 { margin: 0; }\n` +
-    // Neutralize UA heading bold/size so Figma weight/size classes win (font-400 is omitted).
-    `h1, h2, h3 { font-size: inherit; font-weight: inherit; }\n\n` +
+    `body, p { margin: 0; }\n\n` +
     context.styleEntries
       .sort((a, b) => {
         const baseCompare = a.baseName.localeCompare(b.baseName);

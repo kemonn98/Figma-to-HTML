@@ -9,35 +9,6 @@ import { convertRectangle } from './rectangle';
 import { convertEllipse } from './ellipse';
 import { convertVector, isVectorNode } from './vector';
 
-export const findHeroHeadingNodeId = (root: SceneNode): string | null => {
-  const rootH = 'height' in root ? root.height : 0;
-  const band = Math.min(900, rootH * 0.2);
-  let bestId: string | null = null;
-  let bestSize = -1;
-  let bestY = Infinity;
-
-  const walk = (n: SceneNode) => {
-    if (n.visible === false) return;
-    if (n.type === 'TEXT') {
-      const t = n as TextNode;
-      const size = typeof t.fontSize === 'number' ? t.fontSize : 0;
-      const y = t.y;
-      if (size >= 40 && y < band) {
-        if (size > bestSize || (size === bestSize && y < bestY)) {
-          bestId = t.id;
-          bestSize = size;
-          bestY = y;
-        }
-      }
-    }
-    if ('children' in n) {
-      for (const c of n.children) walk(c as SceneNode);
-    }
-  };
-  walk(root);
-  return bestId;
-};
-
 const buildConvertParams = (
   node: SceneNode,
   context: ExportContext,

@@ -1,6 +1,6 @@
 import { toCssColor, roundDim, roundPx } from '../utils/color';
 import type { FigmaGradientPaint, FigmaMaskType } from '../types';
-import { gradientTransformToLinearCss, gradientTransformToRadialCss, gradientTransformToConicCss } from './fills';
+import { gradientTransformToRadialCss, gradientTransformToConicCss, linearGradientToCss } from './fills';
 
 /** Figma mask: a node with isMask=true masks all of its subsequent siblings. */
 export const isMaskNode = (node: SceneNode): boolean =>
@@ -41,14 +41,27 @@ export const getMaskImageFromMaskNode = (node: SceneNode): string | null => {
   if (!fill || fill.type === 'SOLID') return null;
   const g = fill as FigmaGradientPaint;
   const maskType = getMaskType(node);
+  const w = 'width' in node ? (node as { width: number }).width : 100;
+  const h = 'height' in node ? (node as { height: number }).height : 100;
+  if (g.type === 'GRADIENT_LINEAR') {
+    const paintForCss =
+      maskType === 'LUMINANCE'
+        ? ({
+            ...g,
+            gradientStops: g.gradientStops.map((s) => {
+              const c = s.color;
+              const a = 'a' in c ? c.a : 1;
+              const lum = (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) * a;
+              return { position: s.position, color: { r: 0, g: 0, b: 0, a: lum } };
+            }),
+          } as FigmaGradientPaint)
+        : g;
+    return linearGradientToCss(paintForCss, w, h) || null;
+  }
   const stops = gradientStopsToCssForMask(g.gradientStops, maskType);
   if (!stops) return null;
   const t = g.gradientTransform;
   switch (g.type) {
-    case 'GRADIENT_LINEAR': {
-      const angle = gradientTransformToLinearCss(t);
-      return `linear-gradient(${angle}, ${stops})`;
-    }
     case 'GRADIENT_RADIAL': {
       const shape = gradientTransformToRadialCss(t);
       return `radial-gradient(${shape}, ${stops})`;
