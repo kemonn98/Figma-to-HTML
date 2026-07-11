@@ -25,7 +25,7 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 
 ## 1.5.4 — 2026-07-11
 
-**Commit:** _(pending)_
+**Commit:** `e05263b`
 
 - Style tokens: `opacity-*`, `rounded-*` / `rounded-full`, `shadow-inset-*`, `bg-grad-*`, `text-grad-*` (shared utilities, not layer names)
 - Omit default utilities: `justify-start`, `items-start`, `text-left`, `font-400`, `tracking-0`
