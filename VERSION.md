@@ -25,7 +25,7 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 
 ## 1.5.5 — 2026-07-11
 
-**Commit:** _(pending)_
+**Commit:** `7eec8ee`
 
 - All text nodes export as `<p>` (no `h1`–`h4` / hero heading detection)
 - Linear gradients: map Figma handle start/end (via inverse `gradientTransform`) onto the CSS gradient line so custom positions remap stop % (not angle-only)
