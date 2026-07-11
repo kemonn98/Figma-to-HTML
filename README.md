@@ -17,7 +17,7 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 
 1. In Figma, select a **single frame** that has **auto-layout** or **grid layout** enabled.
 2. Run the plugin (e.g. Plugins → Figma to HTML).
-3. Click **Export** to generate the code. HTML and CSS appear in the panels below.
+3. Click **Export**, review the checklist modal, then **Continue export**. HTML and CSS appear in the panels below.
 4. Use **Copy** next to each panel to copy the content, or **Download ZIP** to get `index.html`, `styles.css`, and any `assets/` images.
 
 **Requirements:**
