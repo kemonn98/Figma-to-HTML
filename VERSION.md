@@ -27,7 +27,7 @@ _(none)_
 
 ## 1.5.0 — 2026-07-11
 
-**Commit:** _(pending)_
+**Commit:** `a198094`
 
 - HTML + CSS only: remove React/JSX export, format tabs, `previews/react`, and `unpkg` access
 - Image fills → `assets/*.png` in ZIP; vectors → `assets/*.svg` (`<img>`), not inlined SVG
