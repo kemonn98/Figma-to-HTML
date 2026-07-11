@@ -36,11 +36,33 @@
     text-align: center;
   }
   .hero h1 {
-    margin: 0 0 6px 0;
+    margin: 0;
     font-size: 20px;
     font-weight: 600;
     color: #e5e5e5;
     letter-spacing: -0.02em;
+  }
+  .hero-title {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 0 6px 0;
+  }
+  .version-capsule {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: #a3a3a3;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
   }
   .hero p {
     margin: 0 0 20px 0;
@@ -48,38 +70,6 @@
     color: #737373;
   }
   /* Shared control: 36px height, 12px/500 font, 8px radius, same focus ring */
-  .tabs {
-    display: flex;
-    padding: 3px;
-    background: #1a1a1a;
-    border-radius: 8px;
-    gap: 2px;
-    margin-bottom: 14px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-  }
-  .tab {
-    flex: 1;
-    height: 36px;
-    min-height: 36px;
-    padding: 0 12px;
-    background: none;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    color: #737373;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    transition: color 0.15s, background 0.15s;
-  }
-  .tab:hover { color: #a3a3a3; background: #1f1f1f; }
-  .tab.active { color: #e5e5e5; background: #262626; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-  .tab:focus-visible { outline: 2px solid #525252; outline-offset: 2px; }
-  .tab svg { flex-shrink: 0; }
-  .tab .fa { flex-shrink: 0; font-size: 14px; }
 
   .btn-export {
     width: fit-content;
@@ -212,14 +202,6 @@
     border: none;
     background: #1a1a1a;
   }
-  .preview-react-note {
-    display: none;
-    padding: 16px 20px;
-    margin: 0;
-    font-size: 12px;
-    color: #737373;
-    text-align: center;
-  }
 
   .btn-export .btn-export-dots {
     display: none;
@@ -239,6 +221,56 @@
   }
   .btn-export-dot:nth-child(2) { animation-delay: 0.1s; }
   .btn-export-dot:nth-child(3) { animation-delay: 0.2s; }
+
+  .export-status {
+    display: none;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 12px 0 0;
+    padding: 12px 14px;
+    text-align: left;
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 10px;
+  }
+  .export-status.visible { display: block; }
+  .export-status-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 10px;
+  }
+  .export-status-text {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #a3a3a3;
+    word-break: break-word;
+  }
+  .export-status-meta {
+    margin: 0;
+    flex-shrink: 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #737373;
+    font-variant-numeric: tabular-nums;
+  }
+  .export-status-track {
+    height: 4px;
+    border-radius: 999px;
+    background: #262626;
+    overflow: hidden;
+  }
+  .export-status-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: #0835ff;
+    transition: width 0.2s ease;
+  }
   @keyframes dot-bounce {
     0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
     40% { transform: scale(1); opacity: 1; }
@@ -367,6 +399,42 @@
     pointer-events: none;
   }
 
+  .assets-list {
+    margin: 0;
+    padding: 10px 12px;
+    min-height: 190px;
+    max-height: 280px;
+    overflow: auto;
+    list-style: none;
+  }
+  .assets-list:empty::before {
+    content: 'No assets exported yet…';
+    color: #525252;
+    font-size: 11px;
+  }
+  .assets-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #262626;
+    font-size: 12px;
+  }
+  .assets-item:last-child { border-bottom: none; }
+  .assets-name {
+    color: #d4d4d4;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', Consolas, monospace;
+    font-size: 11px;
+    word-break: break-all;
+  }
+  .assets-size {
+    flex-shrink: 0;
+    color: #737373;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
   .btn {
     height: 36px;
     min-height: 36px;
@@ -445,18 +513,11 @@
 <div class="container">
   <div class="hero">
     <div class="hero-inner">
-      <h1>Figma to Codes</h1>
-      <p>Select an auto-layout frame, then export.</p>
-      <div class="tabs" role="tablist">
-        <button type="button" class="tab active" data-format="html" role="tab" aria-selected="true">
-          <i class="fa-brands fa-html5" aria-hidden="true"></i>
-          HTML
-        </button>
-        <button type="button" class="tab" data-format="react" role="tab" aria-selected="false">
-          <i class="fa-brands fa-react" aria-hidden="true"></i>
-          React
-        </button>
+      <div class="hero-title">
+        <h1>Figma to Codes</h1>
+        <span class="version-capsule" title="Plugin version">v1.5.0</span>
       </div>
+      <p>Select an auto-layout frame, then export.</p>
       <button type="button" id="export" class="btn-export">
         <span class="btn-export-text"><i class="fa-solid fa-code" aria-hidden="true"></i>Export Selected Frames</span>
         <span class="btn-export-dots" aria-hidden="true">
@@ -465,6 +526,15 @@
           <span class="btn-export-dot"></span>
         </span>
       </button>
+      <div id="export-status" class="export-status" aria-live="polite" aria-atomic="true">
+        <div class="export-status-header">
+          <p class="export-status-text" id="export-status-text">Exporting…</p>
+          <p class="export-status-meta" id="export-status-meta">0%</p>
+        </div>
+        <div class="export-status-track" aria-hidden="true">
+          <div class="export-status-bar" id="export-status-bar"></div>
+        </div>
+      </div>
       <div id="preview-canvas-wrap" class="preview-canvas-wrap" aria-live="polite">
         <div class="preview-canvas-header">
           <span class="preview-canvas-header-title">Preview</span>
@@ -491,6 +561,7 @@
           <div class="code-tabs" role="tablist">
             <button type="button" class="code-tab active" data-panel="output" role="tab" aria-selected="true" id="tab-output"><i class="fa-solid fa-code" aria-hidden="true"></i><span class="code-tab-label">HTML</span></button>
             <button type="button" class="code-tab" data-panel="css" role="tab" aria-selected="false" id="tab-css"><i class="fa-solid fa-hashtag" aria-hidden="true"></i><span class="code-tab-label">CSS</span></button>
+            <button type="button" class="code-tab" data-panel="assets" role="tab" aria-selected="false" id="tab-assets"><i class="fa-solid fa-image" aria-hidden="true"></i><span class="code-tab-label">Assets</span></button>
           </div>
           <div class="code-content">
             <div class="code-panel active" id="panel-output" role="tabpanel" aria-labelledby="tab-output">
@@ -519,6 +590,9 @@
                 <textarea id="css" class="code-area" rows="1" aria-label="Exported CSS"></textarea>
               </div>
             </div>
+            <div class="code-panel" id="panel-assets" role="tabpanel" aria-labelledby="tab-assets">
+              <ul class="assets-list" id="assets-list" aria-label="Exported assets"></ul>
+            </div>
           </div>
         </div>
       </section>
@@ -542,10 +616,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
-  let exportFormat = 'html';
   var previewFrameWidth = 0;
   var previewFrameHeight = 0;
   var previewFitScale = 1;
@@ -567,12 +639,53 @@
     }
   }
 
+  function formatBytes(n) {
+    if (!n || n < 0) return '0 B';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (Math.round((n / 1024) * 10) / 10) + ' KB';
+    return (Math.round((n / (1024 * 1024)) * 100) / 100) + ' MB';
+  }
+
+  function assetByteLength(asset) {
+    if (!asset || !asset.bytesBase64) return 0;
+    var b64 = asset.bytesBase64;
+    var padding = 0;
+    if (b64.length >= 2 && b64.charAt(b64.length - 1) === '=') padding++;
+    if (b64.length >= 2 && b64.charAt(b64.length - 2) === '=') padding++;
+    return Math.max(0, Math.floor((b64.length * 3) / 4) - padding);
+  }
+
+  function renderAssetsList(assets) {
+    var list = document.getElementById('assets-list');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!assets || !assets.length) return;
+    var sorted = assets.slice().sort(function(a, b) {
+      return String(a.fileName || '').localeCompare(String(b.fileName || ''));
+    });
+    for (var i = 0; i < sorted.length; i++) {
+      var a = sorted[i];
+      if (!a || !a.fileName) continue;
+      var li = document.createElement('li');
+      li.className = 'assets-item';
+      var name = document.createElement('span');
+      name.className = 'assets-name';
+      name.textContent = a.fileName;
+      var size = document.createElement('span');
+      size.className = 'assets-size';
+      size.textContent = formatBytes(assetByteLength(a));
+      li.appendChild(name);
+      li.appendChild(size);
+      list.appendChild(li);
+    }
+  }
+
   function setToastMessage(el, message) {
     const msgEl = el.querySelector('.toast-message');
     if (msgEl) msgEl.textContent = message;
   }
 
-  function showToast(message, status) {
+  function showToast(message, status, sticky) {
     const el = document.getElementById('toast');
     setToastMessage(el, message);
     el.className = 'toast visible ' + (status || 'info');
@@ -587,12 +700,39 @@
       }
     }
     clearTimeout(el._tid);
-    el._tid = setTimeout(function() { el.classList.remove('visible'); }, 3200);
+    if (!sticky) {
+      el._tid = setTimeout(function() { el.classList.remove('visible'); }, 3200);
+    }
+  }
+
+  function setExportStatus(message, percent) {
+    var wrap = document.getElementById('export-status');
+    var text = document.getElementById('export-status-text');
+    var bar = document.getElementById('export-status-bar');
+    var meta = document.getElementById('export-status-meta');
+    if (!wrap || !text || !bar || !meta) return;
+    wrap.classList.add('visible');
+    text.textContent = message || 'Exporting…';
+    var pct = typeof percent === 'number' && !isNaN(percent)
+      ? Math.max(0, Math.min(100, Math.round(percent)))
+      : 0;
+    bar.style.width = pct + '%';
+    meta.textContent = pct + '%';
+  }
+
+  function clearExportStatus() {
+    var wrap = document.getElementById('export-status');
+    var bar = document.getElementById('export-status-bar');
+    var meta = document.getElementById('export-status-meta');
+    if (wrap) wrap.classList.remove('visible');
+    if (bar) bar.style.width = '0%';
+    if (meta) meta.textContent = '';
   }
 
   function setExportLoading(loading) {
     var btn = document.getElementById('export');
     if (btn) btn.classList.toggle('loading', loading);
+    if (!loading) clearExportStatus();
   }
 
   function setPreviewExpanded(expanded) {
@@ -618,29 +758,104 @@
     if (label) label.textContent = Math.round(scale * 100) + '%';
   }
 
-  function prepareReactScript(jsx) {
-    var code = jsx
-      .replace(/import\s+['"].*?['"]\s*;\s*\n?/g, '')
-      .replace(/\bexport\s+default\s+/g, '');
-    code = code.replace(/<\/script>/gi, '<\\/script>');
-    var renderBlock =
-      'try {\n' +
-      '  if (typeof React === "undefined" || typeof ReactDOM === "undefined") throw new Error("React did not load. External scripts may be blocked.");\n' +
-      '  var __rootEl = document.getElementById("preview-root");\n' +
-      '  var __root = ReactDOM.createRoot(__rootEl);\n' +
-      '  __root.render(React.createElement(ExportedComponent));\n' +
-      '  var __loading = document.getElementById("preview-loading");\n' +
-      '  if (__loading) __loading.remove();\n' +
-      '} catch (e) {\n' +
-      '  var __loading = document.getElementById("preview-loading");\n' +
-      '  if (__loading) __loading.remove();\n' +
-      '  var __el = document.getElementById("preview-root");\n' +
-      '  if (__el) { __el.innerHTML = ""; var __p = document.createElement("p"); __p.style.cssText = "padding:16px;color:#c00;font-family:sans-serif;font-size:12px;max-width:280px;"; __p.textContent = "Preview error: " + (e && e.message ? e.message : String(e)); __el.appendChild(__p); }\n' +
-      '}';
-    return code + '\n' + renderBlock;
+  var lastExportAssets = [];
+
+  function base64ToUint8Array(b64) {
+    var binary = atob(b64);
+    var len = binary.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
   }
 
-  function updatePreviewCanvas(html, css, format, frameWidth, frameHeight) {
+  function buildAssetDataUrlMap(assets) {
+    var map = {};
+    if (!assets || !assets.length) return map;
+    for (var i = 0; i < assets.length; i++) {
+      var a = assets[i];
+      if (!a || !a.fileName || !a.bytesBase64) continue;
+      var mime = a.mimeType || 'image/png';
+      map['assets/' + a.fileName] = 'data:' + mime + ';base64,' + a.bytesBase64;
+    }
+    return map;
+  }
+
+  function rewriteAssetUrls(html, css, assetMap) {
+    var outHtml = html || '';
+    var outCss = css || '';
+    Object.keys(assetMap).forEach(function(path) {
+      var dataUrl = assetMap[path];
+      outHtml = outHtml.split(path).join(dataUrl);
+      outCss = outCss.split(path).join(dataUrl);
+    });
+    return { html: outHtml, css: outCss };
+  }
+
+  /**
+   * Preview-only: replace FA <i data-preview-fa> with SVG <img> so Pro icons
+   * render without a Pro CDN. Exported HTML/ZIP keep the original <i> tags.
+   */
+  function rewriteFaIconsForPreview(html, previewFaIcons) {
+    if (!html || !previewFaIcons || !previewFaIcons.length) return html || '';
+    var map = {};
+    for (var i = 0; i < previewFaIcons.length; i++) {
+      var icon = previewFaIcons[i];
+      if (icon && icon.id && icon.bytesBase64) map[icon.id] = icon;
+    }
+    return html.replace(/<i\b([^>]*\bdata-preview-fa=["']([^"']+)["'][^>]*)>\s*<\/i>/gi, function(_full, attrs, id) {
+      var icon = map[id];
+      if (!icon) return _full;
+      var dataUrl = 'data:image/svg+xml;base64,' + icon.bytesBase64;
+      var w = icon.width > 0 ? icon.width : 16;
+      var h = icon.height > 0 ? icon.height : 16;
+      var styleMatch = String(attrs).match(/\bstyle=["']([^"']*)["']/i);
+      var existing = styleMatch ? styleMatch[1].replace(/;?\s*$/, '') : '';
+      var style =
+        (existing ? existing + '; ' : '') +
+        'display: inline-block; width: ' + w + 'px; height: ' + h + 'px; ' +
+        'object-fit: contain; vertical-align: middle; flex-shrink: 0';
+      var layerMatch = String(attrs).match(/\bdata-layer=["']([^"']*)["']/i);
+      var layerAttr = layerMatch ? ' data-layer="' + layerMatch[1] + '"' : '';
+      return (
+        '<img' + layerAttr + ' data-preview-fa="' + id + '" src="' + dataUrl +
+        '" alt="" aria-hidden="true" style="' + style + '" />'
+      );
+    });
+  }
+
+  function getPreviewBodyHtml(html) {
+    if (!html) return '';
+    var m = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    return m ? m[1] : html;
+  }
+
+  /** Pull FA / Google Fonts <link>s from export HTML so preview can render icons & type. */
+  function getPreviewHeadLinks(html) {
+    var links = [];
+    var seen = {};
+    function add(tag) {
+      if (!tag || seen[tag]) return;
+      seen[tag] = true;
+      links.push(tag);
+    }
+    if (html) {
+      var re = /<link\b[^>]*>/gi;
+      var m;
+      while ((m = re.exec(html)) !== null) {
+        var tag = m[0];
+        if (/font-awesome|fonts\.googleapis|fonts\.gstatic/i.test(tag)) add(tag);
+      }
+    }
+    var body = getPreviewBodyHtml(html);
+    var hasFaIcon = /\bclass\s*=\s*["'][^"']*\bfa-(solid|brands|regular|classic)\b/i.test(body)
+      || /\bclass\s*=\s*["'][^"']*\bfa-[a-z0-9-]+\b/i.test(body);
+    if (hasFaIcon && !links.some(function(l) { return /font-awesome/i.test(l); })) {
+      add('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">');
+    }
+    return links.join('');
+  }
+
+  function updatePreviewCanvas(html, css, frameWidth, frameHeight) {
     var wrap = document.getElementById('preview-canvas-wrap');
     var iframe = document.getElementById('preview-iframe');
     if (!wrap || !iframe) return;
@@ -650,48 +865,32 @@
     previewFrameWidth = frameWidth > 0 ? frameWidth : 1;
     previewFrameHeight = frameHeight > 0 ? frameHeight : 1;
     previewZoomLevel = 1;
+    // Lock preview-root to artboard size so exported root `width: 100%` resolves
+    // against the design width — not the tiny iframe — before we scale to fit.
+    var fw = previewFrameWidth;
+    var fh = previewFrameHeight;
     var scaleStyles =
       'html,body{width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;overflow:hidden !important;background:#fff !important;position:relative !important;}' +
       'body{box-sizing:border-box !important;}' +
-      '#preview-root{display:inline-block;position:absolute !important;left:50% !important;top:50% !important;transform:translate(-50%, -50%) scale({{SCALE}});transform-origin:center center;}';
-
-    if (format === 'react') {
-      var scriptContent = prepareReactScript(html);
-      var scalePlaceholder = '{{SCALE}}';
-      function writeReactIframe(initialScale) {
-        var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
-        if (!doc) return;
-        var scaleCss = scaleStyles.replace(scalePlaceholder, initialScale);
-        doc.open();
-        var loadingHtml = '<div id="preview-loading" style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5;color:#666;font-family:sans-serif;font-size:13px;">Loading preview…</div>';
-        var fallbackScript =
-          '<script>setTimeout(function(){ var L=document.getElementById("preview-loading"); if(L){ L.style.background="#fff"; L.style.color="#c00"; L.style.fontSize="12px"; L.style.padding="16px"; L.style.textAlign="center"; L.textContent="Preview could not load. External scripts may be blocked (e.g. in Figma). Run the exported code in a local project to preview."; } }, 6000);<\/script>';
-        doc.write(
-          '<!DOCTYPE html><html><head><meta charset="utf-8">' +
-          (css ? '<style>' + css.replace(/<\/style>/gi, '<\\/style>') + '</style>' : '') +
-          '<style>' + scaleCss + '</style></head><body>' +
-          loadingHtml +
-          '<div id="preview-root"></div>' +
-          '<script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>' +
-          '<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>' +
-          '<script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>' +
-          '<script type="text/babel" data-presets="react">' + scriptContent + '<\/script>' +
-          fallbackScript +
-          '</body></html>'
-        );
-        doc.close();
-        var label = document.getElementById('preview-zoom-label');
-        if (label) label.textContent = Math.round(initialScale * 100) + '%';
-      }
-      setTimeout(function() {
-        var size = getPreviewContainerSize();
-        previewFitScale = Math.min(size.w / previewFrameWidth, size.h / previewFrameHeight);
-        if (previewFitScale > 1) previewFitScale = 1;
-        var initialScale = previewFitScale * previewZoomLevel;
-        writeReactIframe(initialScale);
-      }, 0);
-      return;
-    }
+      '#preview-root{' +
+        'display:block;' +
+        'width:' + fw + 'px;' +
+        'height:' + fh + 'px;' +
+        'position:absolute !important;' +
+        'left:50% !important;' +
+        'top:50% !important;' +
+        'transform:translate(-50%, -50%) scale({{SCALE}});' +
+        'transform-origin:center center;' +
+        'overflow:visible;' +
+      '}' +
+      '#preview-root > *{' +
+        'width:' + fw + 'px !important;' +
+        'max-width:none !important;' +
+        'min-width:' + fw + 'px !important;' +
+        'margin-inline:0 !important;' +
+      '}';
+    var bodyHtml = getPreviewBodyHtml(html);
+    var headLinks = getPreviewHeadLinks(html);
 
     function writeIframe(initialScale) {
       var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
@@ -700,9 +899,10 @@
       doc.open();
       doc.write(
         '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+        headLinks +
         (css ? '<style>' + css + '</style>' : '') +
         '<style>' + scaleCss + '</style></head><body>' +
-        '<div id="preview-root">' + (html || '') + '</div></body></html>'
+        '<div id="preview-root">' + (bodyHtml || '') + '</div></body></html>'
       );
       doc.close();
       var label = document.getElementById('preview-zoom-label');
@@ -716,6 +916,7 @@
       writeIframe(initialScale);
     }, 0);
   }
+
 
   function copyToClipboard(id) {
     var el = document.getElementById(id);
@@ -753,18 +954,6 @@
     }
   }
 
-  document.querySelectorAll('.tab').forEach(function(tab) {
-    tab.onclick = function() {
-      document.querySelectorAll('.tab').forEach(function(t) {
-        t.classList.remove('active');
-        t.setAttribute('aria-selected', 'false');
-      });
-      tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-      exportFormat = tab.dataset.format;
-    };
-  });
-
   document.querySelectorAll('.code-tab').forEach(function(btn) {
     btn.onclick = function() {
       var panelId = btn.dataset.panel;
@@ -780,8 +969,8 @@
 
   document.getElementById('export').onclick = function() {
     setExportLoading(true);
-    showToast('Exporting…', 'info');
-    parent.postMessage({ pluginMessage: { type: 'export', format: exportFormat } }, '*');
+    setExportStatus('Starting export…', 0);
+    parent.postMessage({ pluginMessage: { type: 'export' } }, '*');
   };
 
   document.getElementById('download-zip').onclick = function() {
@@ -793,12 +982,15 @@
     }
     showToast('Preparing ZIP…', 'info');
     var zip = new JSZip();
-    if (exportFormat === 'react') {
-      zip.file('Component.jsx', output);
-    } else {
-      zip.file('index.html', output);
-    }
+    zip.file('index.html', output);
     zip.file('styles.css', css);
+    if (lastExportAssets && lastExportAssets.length) {
+      for (var i = 0; i < lastExportAssets.length; i++) {
+        var a = lastExportAssets[i];
+        if (!a || !a.fileName || !a.bytesBase64) continue;
+        zip.file('assets/' + a.fileName, base64ToUint8Array(a.bytesBase64));
+      }
+    }
     zip.generateAsync({ type: 'blob' }).then(function(blob) {
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
@@ -826,37 +1018,31 @@
   onmessage = function(event) {
     var msg = event.data && event.data.pluginMessage;
     if (!msg || !msg.type) return;
+    if (msg.type === 'export-progress') {
+      setExportStatus(msg.message || 'Exporting…', msg.percent);
+      return;
+    }
     if (msg.type === 'export-result') {
       setExportLoading(false);
-      var content = msg.jsx != null ? msg.jsx : msg.html;
-      var receivedFormat = msg.format || (msg.jsx != null ? 'react' : 'html');
       var outputEl = document.getElementById('output');
       var cssEl = document.getElementById('css');
-      outputEl.value = content || '';
+      outputEl.value = msg.html || '';
       cssEl.value = msg.css || '';
-      if (msg.format != null || msg.jsx != null) {
-        exportFormat = receivedFormat;
-        document.querySelectorAll('.tab').forEach(function(t) {
-          var active = t.dataset.format === receivedFormat;
-          t.classList.toggle('active', active);
-          t.setAttribute('aria-selected', active ? 'true' : 'false');
-        });
-      }
-      var tabOutput = document.getElementById('tab-output');
-      var tabLabel = tabOutput && tabOutput.querySelector('.code-tab-label');
-      if (tabLabel) tabLabel.textContent = exportFormat === 'react' ? 'JSX' : 'HTML';
+      lastExportAssets = msg.assets || [];
+      renderAssetsList(lastExportAssets);
       setPreviewExpanded(true);
+      var assetMap = buildAssetDataUrlMap(lastExportAssets);
+      var previewDocs = rewriteAssetUrls(outputEl.value, cssEl.value, assetMap);
+      var previewHtml = rewriteFaIconsForPreview(previewDocs.html, msg.previewFaIcons || []);
       updatePreviewCanvas(
-        outputEl.value,
-        cssEl.value,
-        receivedFormat,
+        previewHtml,
+        previewDocs.css,
         msg.frameWidth,
         msg.frameHeight
       );
       showToast('Export complete.', 'success');
       setTimeout(function() {
-        var markupLang = exportFormat === 'react' ? 'jsx' : 'markup';
-        renderHighlightedCode('output-display', outputEl.value, markupLang);
+        renderHighlightedCode('output-display', outputEl.value, 'markup');
         renderHighlightedCode('css-display', cssEl.value, 'css');
       }, 0);
     }

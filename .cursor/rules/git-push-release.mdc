@@ -1,7 +1,7 @@
 ---
 description: >-
   Prompt listener for "git push", "git push minor", and "git push major".
-  Runs release: inspect changes, bump version, update docs, commit, push, verify clean.
+  Runs release: inspect changes, bump version, update docs, commit, push, npm run build, verify clean.
 alwaysApply: true
 ---
 
@@ -47,6 +47,7 @@ Update:
 
 1. `VERSION.md` — set **Current version**, move Unreleased notes into a new dated section with commit placeholder, clear/reset Unreleased
 2. `package.json` — `"version"` field to the same value
+3. `ui.html` — version capsule text (e.g. `v1.4.2`) next to “Figma to Codes” to the same value
 
 ### 3. Update README.md
 
@@ -66,16 +67,18 @@ Follow the repo commit protocol (status/diff/log → stage → HEREDOC commit me
   - Examples: `fix rotation handling and clean up TypeScript lint errors`, `add group export support`, `update plugin UI layout`
 - After commit, working tree must be clean except ignored files.
 
-### 6. Push and verify clean
+### 6. Push, build, and verify clean
 
 ```bash
 git push
+npm run build
 git status
 ```
 
 - Push the current branch to `origin` (use `-u` only if upstream is missing).
-- Confirm: branch up to date with remote, **no uncommitted changes**.
-- Report to the user: new version, commit hash, push result, clean status.
+- Immediately run `npm run build` so `code.js` is regenerated from `code.ts` for Figma.
+- Confirm: branch up to date with remote, **no uncommitted changes** (build output `code.js` is gitignored — that is expected).
+- Report to the user: new version, commit hash, push result, build result, clean status.
 
 ### 7. Optional tag
 

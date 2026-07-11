@@ -1,2 +1,63 @@
-body, p { margin: 0; }
+html { font-size: 16px; }
+body, p, h1 { margin: 0; }
+
+.InHouse {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+.MonthlyCost {
+  color: rgba(0, 0, 0, 0.9);
+}
+
+.N6k12kLoaded {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.font-500 {
+  font-weight: 500;
+}
+
+.fontfam-inter-display {
+  font-family: "Inter Display";
+}
+
+.group {
+  display: block;
+}
+
+.leading-110 {
+  line-height: 110%;
+}
+
+.leading-150 {
+  line-height: 150%;
+}
+
+.text-14 {
+  font-size: 0.875rem;
+}
+
+.text-16 {
+  font-size: 1rem;
+}
+
+.text-24 {
+  font-size: 1.5rem;
+}
+
+.text-40 {
+  font-size: 2.5rem;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.tracking-0 {
+  letter-spacing: 0em;
+}
+
+.tracking-neg-2 {
+  letter-spacing: -0.02em;
+}
 

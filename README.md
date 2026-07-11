@@ -1,17 +1,15 @@
 # Figma to HTML
 
-A Figma plugin that exports a selected **frame with auto-layout** to **HTML + CSS** or **React (JSX) + CSS**, so you can use the result in a browser or in your project.
+A Figma plugin that exports a selected **frame with auto-layout** to **HTML + CSS**, so you can use the result in a browser or in your project.
 
 ---
 
 ## What it does
 
 - **Input:** One frame selected in Figma that uses **auto-layout** (layout mode is not "None"). Grid layout is also supported.
-- **Output:** Depending on the chosen format:
-  - **HTML + CSS:** A full HTML document and a separate CSS file (`index.html`, `styles.css`).
-  - **React:** A JSX component file and the same CSS file (`Component.jsx`, `styles.css`).
+- **Output:** A full HTML document and a separate CSS file (`index.html`, `styles.css`).
 
-The plugin walks the frame tree, maps Figma’s layout and styles to HTML/JSX elements and CSS (utility-style classes + inline styles where needed), and returns the markup and CSS. The plugin UI is 370×500px.
+The plugin walks the frame tree, maps Figma’s layout and styles to HTML elements and CSS (utility-style classes + inline styles where needed), and returns the markup and CSS. The plugin UI is 370×500px.
 
 ---
 
@@ -19,9 +17,8 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML/JSX el
 
 1. In Figma, select a **single frame** that has **auto-layout** or **grid layout** enabled.
 2. Run the plugin (e.g. Plugins → Figma to HTML).
-3. Choose **HTML + CSS** or **React** in the plugin UI.
-4. Click **Export** to generate the code. HTML/JSX and CSS appear in the text areas below.
-5. Use **Copy** next to each panel to copy the content, or **Download ZIP** to get a ZIP with `index.html` + `styles.css` (HTML) or `Component.jsx` + `styles.css` (React).
+3. Click **Export** to generate the code. HTML and CSS appear in the panels below.
+4. Use **Copy** next to each panel to copy the content, or **Download ZIP** to get `index.html`, `styles.css`, and any `assets/` images.
 
 **Requirements:**
 
@@ -33,12 +30,11 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML/JSX el
 
 ## UI (ui.html)
 
-- **Header:** Title "Figma to Codes" and short instructions.
-- **Format tabs:** Switch between **HTML + CSS** and **React** before exporting.
-- **Export:** Runs the export with the selected format; shows a progress bar and toast when done.
-- **Download ZIP:** Builds a ZIP with the current HTML/JSX and CSS (export first if needed). Filename: `figma-export.zip`.
-- **Output panels:** One for HTML/JSX and one for CSS, each with a copy button and resizable textarea.
-- **Toasts:** Success ("Export complete.", "Copied to clipboard.", "ZIP downloaded."), error (e.g. "Select a frame with auto-layout.", "Export first to download."), and info ("Exporting…", etc.).
+- **Header:** Title "Figma to Codes", version capsule, and short instructions.
+- **Export:** Runs the export; shows a full-width status card with step text and a single 0–100% progress bar.
+- **Download ZIP:** Builds a ZIP with HTML, CSS, and exported files under `assets/` (PNG images and SVG vectors; export first if needed). Filename: `figma-export.zip`.
+- **Output panels:** Tabs for **HTML**, **CSS**, and **Assets** (name + size list).
+- **Toasts:** Success/error only (e.g. "Export complete.", "Copied to clipboard.", "ZIP downloaded."); progress stays in the status card.
 
 ---
 
@@ -46,29 +42,29 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML/JSX el
 
 ### Export flow
 
-- The UI sends `{ type: 'export', format: 'html' | 'react' }` to the plugin code.
-- The plugin calls `exportSelection(format)`, which checks that the selection is a single frame with auto-layout or grid (not `layoutMode === 'NONE'`), builds an **export context**, and runs the tree walk.
-- The tree is converted recursively with `nodeToHtmlCss(node, context, parentLayoutMode, parentFrame, outputFormat)`.
-- Result: `{ format: 'html', html, css }` or `{ format: 'react', jsx, css }`. HTML is a full document (doctype, head, body, optional Google Fonts links, link to `styles.css`). React output is a default-exported function component that imports `./styles.css` and returns the JSX. CSS is shared and written to `styles.css`.
+- The UI sends `{ type: 'export' }` to the plugin code.
+- The plugin calls `exportSelection()`, which checks that the selection is a single frame with auto-layout or grid (not `layoutMode === 'NONE'`), builds an **export context**, and runs the tree walk.
+- The tree is converted recursively with `nodeToHtmlCss(...)`.
+- Result: `{ html, css, frameWidth, frameHeight, assets }`. HTML is a full document (doctype, head, body, optional Google Fonts / Font Awesome CDN links, link to `styles.css`). Image fills are written as files under `assets/` and referenced by relative path. CSS is written to `styles.css`.
 
 ### Node types supported
 
-| Figma node   | HTML/JSX element | What's exported |
+| Figma node   | HTML element | What's exported |
 |-------------|-------------------|-----------------|
-| **Frame**   | `<div>`           | Auto-layout → flex (direction, gap, padding, justify, align, wrap, row-gap/column-gap, align-content); grid → `display: grid`, template rows/columns, gap; sizing (flex-1, self-stretch, fixed width/height); solid fill; corner radius; strokes (solid or gradient: linear/radial/angular/diamond; position: inside, center, outside; thickness; dashed when dash pattern set) → box-shadow inset / outline / border / border-image; effects (drop/inner shadow, layer blur); opacity; blend mode; clipsContent → overflow hidden (skipped if a descendant has layer blur, so blur is not clipped); rotation; absolute children (parent gets `position: relative`). Non–auto-layout frames get fixed width/height. Image fill (no solid) → placeholder background `#e5e7eb`. Non-absolute children get `position: relative` and z-index (or reverse order if `itemReverseZIndex`). Invisible spacers (height &lt; 1, opacity ≈ 0, no children) are skipped. |
-| **Text**    | `<p>`             | Characters (HTML/JSX-escaped); font size, weight, line-height, letter-spacing, font family, text align, text case (uppercase, lowercase, capitalize, small-caps), text decoration (underline, line-through); sizing; paragraph spacing (margin-bottom); absolute position; rotation. **Text color:** solid fill on node, or per-segment when fills are mixed (`getStyledTextSegments` → `<span style="...">` / `style={{ color: '...' }}` per segment). |
-| **Rectangle** | `<div>`         | Solid fill; corner radius; width/height (or flex fill); strokes (solid or gradient, align inside/center/outside, weight, dashed) and effects; opacity; blend mode; absolute position; rotation. Image fill (no solid) → placeholder `#e5e7eb`. Invisible spacers skipped. |
-| **Vector / Line / Ellipse / Polygon / Star / Boolean operation** | `<div>` wrapping SVG | Exported via `exportAsync({ format: 'SVG' })`, decoded and inlined; SVG IDs made unique to avoid collisions. Sizing and position classes + optional rotation. If only invisible strokes → placeholder div `#e5e7eb`. On export error, fallback placeholder. |
+| **Frame**   | `<div>`           | Auto-layout → flex; grid → CSS grid; sizing; solid/gradient fills; image fills → `assets/*.png` (`<img>` or `background-image`); corner radius; strokes; effects; opacity; blend; **Clip content** (`clipsContent`) → `overflow: hidden` (+ `clip-path` when rounded — required for masking); rotation; absolute children (parent `position: relative`). Root frame uses `width: 100%`, `max-width`, `min-height`, `margin-inline: auto`. Invisible spacers skipped. |
+| **Text**    | `<p>` or `<h1>` / `<i>` / `<img>` | Normal text → `<p>` (largest hero text ≥40px in top band → single `<h1>`). Font Awesome → `<i class="fa-solid\|fa-brands fa-…">` + CDN. Other icon fonts with short slug → `assets/*.svg` via `<img>`. Mixed fills → per-segment spans. |
+| **Rectangle** | `<div>` (+ optional `<img>`) | Solid fill / image asset; corner radius; strokes; effects; sizing; position; rotation. |
+| **Vector / Line / Ellipse / Polygon / Star / Boolean operation** | `<div>` + `<img>` or border | Simple axis-aligned **LINE** / 2-point **VECTOR** dividers → CSS `border-top` / `border-left` (no SVG). Other shapes → `exportAsync` → `assets/*.svg`. |
 
 Other node types are not converted.
 
 ### Styling approach
 
-- **Output format:** HTML uses `class="..."` and `style="..."`; React uses `className="..."` and `style={{ ... }}` (camelCase CSS props).
-- **Utility-style classes** (Tailwind-like): Flex (`flex`, `flex-row`, `flex-col`, `flex-wrap`), grid (`grid`, `grid-rows-N`, `grid-cols-N`), gap (`gap-N`, `row-gap-N`, `column-gap-N`), content (`content-between`), padding (`p-N`, `pt-N`, `pr-N`, `pb-N`, `pl-N`), justify (`justify-start`, `justify-center`, etc.), align (`items-start`, `items-center`, etc.), font size (`text-N`), font weight (`font-N`), line-height (`leading-N`), letter-spacing (`tracking-N`), font family (`fontfam-<name>`), text align (`text-left`, `text-center`, etc.), text transform (`tt-uppercase`, etc.), text decoration (`decoration-underline`, etc.), and layout helpers (`flex-1`, `self-stretch`). Numeric values in class names can be negative (e.g. `gap-neg-4`).
-- **Deduplication:** Same "CSS signature" reuses the same class name via a `styleMap`. Utility classes are registered once in `utilityClasses`.
-- **Naming:** Node names are sanitized (lowercase, alphanumeric + hyphens/underscores, spaces → hyphens) and used as base class names. Duplicates get numeric suffixes (`baseName`, `baseName-2`, …).
-- **Inline styles** are used when necessary: explicit dimensions, background color, border-radius, strokes (solid: box-shadow inset / outline / border by strokeAlign; gradient: border-image; dashed when dash pattern present), effects (box-shadow, filter blur), positioning (absolute with left/right/top/bottom/transform), opacity, mix-blend-mode, overflow, box-sizing, rotation.
+- **Markup:** HTML uses `class="..."` and `style="..."`. Positioning stays inline; shared visuals (fill, radius, shadow, color) prefer CSS classes via `styleMap`.
+- **Units:** Gap, padding, and font-size utilities use **rem** (`16px = 1rem`). Class names keep Figma px tokens (`gap-16`, `text-56`). Absolute `left`/`top`/fixed sizes stay **px**.
+- **Utility-style classes** (Tailwind-like): Flex, grid, gap, padding, justify, align, font size/weight, line-height, letter-spacing, font family, text align/transform/decoration, `flex-1`, `self-stretch`. Zero gap/padding utilities are omitted.
+- **Deduplication:** Same CSS signature reuses the same class via `styleMap`.
+- **Inline styles:** Positioning, transforms, overflow/clip-path, and one-off sizes.
 
 ### Layout mapping
 
@@ -92,21 +88,21 @@ Other node types are not converted.
 ### Helpers (summary)
 
 - **sanitizeName:** Lowercase, strip invalid characters, spaces → hyphens, trim leading/trailing hyphens (for class names).
-- **escapeHtml / escapeJsxText:** Escape special characters in text content (JSX also escapes `{`, `}`).
+- **escapeHtml:** Escape special characters in text content.
 - **formatNegativeClassValue:** Class-safe value (e.g. negative padding → `neg-N` in class name).
 - **Font weight:** Inferred from font style string (e.g. "Bold" → 700, "Light" → 300).
 - **Fills:** `getSolidFill` (frames/rectangles), `getSolidTextFill` (text); `hasImageFill` for placeholder background when no solid fill.
 - **Strokes:** `getStrokePaint` / `getStrokeStyles` — solid → box-shadow inset (INSIDE), outline (OUTSIDE), or border (CENTER); gradient → border-image; dashed when dash pattern present. `hasInvisibleStrokesOnly` for vectors that become placeholders.
 - **Effects:** `getEffectsStyles` — drop shadow, inner shadow → box-shadow; layer blur → filter: blur().
 - **Blend mode:** `mapBlendMode` → `mix-blend-mode` (only if not normal).
-- **Vectors:** `isVectorNode` (VECTOR, LINE, ELLIPSE, POLYGON, STAR, BOOLEAN_OPERATION); `decodeSvgBytes`, `makeSvgIdsUnique` for inlined SVG.
+- **Vectors:** `isVectorNode` (VECTOR, LINE, ELLIPSE, POLYGON, STAR, BOOLEAN_OPERATION); `exportAsync` → `assets/*.svg` referenced by `<img>` (not inlined).
 - **Layout:** `isAbsoluteChild` for absolute positioning vs `position: relative` + z-index for stacking.
 
 ### Output format
 
-- **HTML:** Full document with `<!doctype html>`, `<html lang="en">`, head (charset, viewport, title, optional Google Fonts preconnect + link, `<link rel="stylesheet" href="styles.css">`), and body with the exported markup.
-- **React:** Single file: `import './styles.css';` and a default-exported function `ExportedComponent()` returning the JSX (indented). Use with `styles.css` in the same folder.
-- **CSS:** Optional `@import` for Google Fonts (used font families, excluding "font awesome"), then `body, p { margin: 0; }`, then all generated rules sorted by base name and suffix. Save as `styles.css` next to the HTML or JSX file.
+- **HTML:** Full document with optional Google Fonts and Font Awesome 7 CDN (`all.min.css` when FA icons are used), link to `styles.css`, and body markup. Images reference `assets/<name>.png`.
+- **CSS:** `html { font-size: 16px; }`, `body, p, h1 { margin: 0; }`, then generated utility/component rules (rem for spacing and font-size).
+- **ZIP:** `index.html`, `styles.css`, and `assets/*` when images were exported.
 
 ---
 

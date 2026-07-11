@@ -2,7 +2,7 @@
 
 Changelog and version history for **Figma to HTML** (Figma plugin: *Figma to Codes*).
 
-**Current version: `1.4.2`**
+**Current version: `1.5.0`**
 
 Source of truth for released history: commits on `main` → [kemonn98/Figma-to-HTML](https://github.com/kemonn98/Figma-to-HTML).  
 `package.json` should stay in sync with the version declared here.
@@ -22,6 +22,23 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 ## Unreleased
 
 _(none)_
+
+---
+
+## 1.5.0 — 2026-07-11
+
+**Commit:** _(pending)_
+
+- HTML + CSS only: remove React/JSX export, format tabs, `previews/react`, and `unpkg` access
+- Image fills → `assets/*.png` in ZIP; vectors → `assets/*.svg` (`<img>`), not inlined SVG
+- Font Awesome → CDN `<i class="fa-*">`; Pro icons use SVG snapshots in plugin preview only
+- Other icon fonts → SVG assets; text newlines → `<br>`; CSS class names never start with a digit
+- Simple axis-aligned LINE/2-point VECTOR dividers → CSS `border-top` / `border-left`
+- Clip content always honored (`overflow` + rounded `clip-path`); groups get positioning context
+- Rotated group children positioned via AABB; vector wrappers always sized
+- Rem-based gap/padding/font-size; root `max-width`/`min-height`; hero large text → `<h1>`
+- Plugin UI: Assets tab, version capsule, unified 0–100% export status card; toast on complete/error only
+- Preview: artboard-sized scale, FA/Google Fonts links; `manifest` allows fonts CDNs
 
 ---
 
