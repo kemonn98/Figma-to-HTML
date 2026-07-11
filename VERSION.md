@@ -27,7 +27,7 @@ _(none)_
 
 ## 1.5.2 — 2026-07-11
 
-**Commit:** _(pending)_
+**Commit:** `aade361`
 
 - Export checklist modal (auto layout, assets, naming, clip tips) before starting export
 - Status card: primary step text and % in white; detail (filename) in gray
