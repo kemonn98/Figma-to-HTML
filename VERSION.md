@@ -27,7 +27,7 @@ _(none)_
 
 ## 1.5.1 — 2026-07-11
 
-**Commit:** _(pending)_
+**Commit:** `b4fd61c`
 
 - Icon fonts (including Font Awesome) export as `assets/*.svg` + `<img>`; remove Font Awesome CDN from export HTML/preview
 - Split plugin logic into `src/` modules; build with esbuild → `code.js`
