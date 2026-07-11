@@ -9,7 +9,7 @@ A Figma plugin that exports a selected **frame with auto-layout** to **HTML + CS
 - **Input:** One frame selected in Figma that uses **auto-layout** (layout mode is not "None"). Grid layout is also supported.
 - **Output:** A full HTML document and a separate CSS file (`index.html`, `styles.css`).
 
-The plugin walks the frame tree, maps Figma’s layout and styles to HTML elements and CSS (utility-style classes + inline styles where needed), and returns the markup and CSS. The plugin UI is 370×500px.
+The plugin walks the frame tree, maps Figma’s layout and styles to HTML elements and CSS (utility-style classes + inline styles where needed), and returns the markup and CSS. The plugin UI is 370×600px.
 
 ---
 
@@ -31,10 +31,12 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 ## UI (ui.html)
 
 - **Header:** Title "Figma to Codes", version capsule, and short instructions.
-- **Export:** Runs the export; shows a full-width status card with step text and a single 0–100% progress bar.
+- **Export:** Opens a checklist modal (auto layout, assets, naming, clip tips); after **Continue export**, runs the export and shows a full-width status card (primary step + % in white, detail/filename in gray, 0–100% bar).
 - **Download ZIP:** Builds a ZIP with HTML, CSS, and exported files under `assets/` (PNG images and SVG vectors; export first if needed). Filename: `figma-export.zip`.
 - **Output panels:** Tabs for **HTML**, **CSS**, and **Assets** (name + size list).
 - **Toasts:** Success/error only (e.g. "Export complete.", "Copied to clipboard.", "ZIP downloaded."); progress stays in the status card.
+
+The plugin UI is 370×600px.
 
 ---
 

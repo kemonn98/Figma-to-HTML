@@ -4,7 +4,7 @@ import type { ExportMessage } from './types';
 import { exportSelection } from './export/selection';
 
 figma.showUI(__html__);
-figma.ui.resize(370, 500);
+figma.ui.resize(370, 600);
 
 figma.ui.onmessage = (msg: ExportMessage) => {
   if (msg.type === 'export') {

@@ -239,7 +239,6 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    margin: 0 0 10px;
   }
   .export-status-text {
     margin: 0;
@@ -250,12 +249,18 @@
     color: #a3a3a3;
     word-break: break-word;
   }
+  .export-status-primary {
+    color: #fafafa;
+  }
+  .export-status-detail {
+    color: #737373;
+  }
   .export-status-meta {
     margin: 0;
     flex-shrink: 0;
     font-size: 11px;
     line-height: 1.4;
-    color: #737373;
+    color: #fafafa;
     font-variant-numeric: tabular-nums;
   }
   .export-status-track {
@@ -508,6 +513,135 @@
   .toast.success .toast-icon { color: #22c55e; }
   .toast.error .toast-icon { color: #ef4444; }
   .toast.info .toast-icon { color: #737373; }
+
+  /* Export checklist modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.72);
+  }
+  .modal-overlay.visible {
+    display: flex;
+  }
+  .modal {
+    width: 100%;
+    max-width: 340px;
+    max-height: calc(100% - 8px);
+    display: flex;
+    flex-direction: column;
+    background: #141414;
+    border: 1px solid #262626;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+  }
+  .modal-header {
+    padding: 14px 16px 0;
+    flex-shrink: 0;
+  }
+  .modal-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fafafa;
+    letter-spacing: -0.01em;
+  }
+  .modal-subtitle {
+    margin: 6px 0 0;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #a3a3a3;
+  }
+  .modal-body {
+    padding: 12px 16px 14px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+  .modal-tips {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .modal-tips li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #a3a3a3;
+    text-align: left;
+  }
+  .modal-tips li strong {
+    color: #e5e5e5;
+    font-weight: 550;
+  }
+  .modal-tip-icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    background: #1f1f1f;
+    color: #737373;
+    font-size: 9px;
+  }
+  .modal-tip-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .modal-tip-text code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 10px;
+    color: #d4d4d4;
+    background: #1f1f1f;
+    padding: 1px 4px;
+    border-radius: 4px;
+  }
+  .modal-footer {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 14px;
+    flex-shrink: 0;
+  }
+  .modal-btn {
+    flex: 1;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .modal-btn:focus-visible { outline: 2px solid #525252; outline-offset: 2px; }
+  .modal-btn-secondary {
+    background: #262626;
+    color: #e5e5e5;
+  }
+  .modal-btn-secondary:hover { background: #333; }
+  .modal-btn-primary {
+    background: #002beb;
+    color: #fafafa;
+  }
+  .modal-btn-primary:hover { background: #0835ff; }
 </style>
 
 <div class="container">
@@ -515,7 +649,7 @@
     <div class="hero-inner">
       <div class="hero-title">
         <h1>Figma to Codes</h1>
-        <span class="version-capsule" title="Plugin version">v1.5.1</span>
+        <span class="version-capsule" title="Plugin version">v1.5.2</span>
       </div>
       <p>Select an auto-layout frame, then export.</p>
       <button type="button" id="export" class="btn-export">
@@ -602,6 +736,47 @@
           Download ZIP
         </button>
       </footer>
+    </div>
+  </div>
+</div>
+
+<div id="export-checklist-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="export-checklist-title" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="export-checklist-title">Before you export</h2>
+      <p class="modal-subtitle">Review these tips for cleaner, more precise HTML &amp; CSS output.</p>
+    </div>
+    <div class="modal-body">
+      <ul class="modal-tips">
+        <li>
+          <span class="modal-tip-icon" aria-hidden="true"><i class="fa-solid fa-table-columns"></i></span>
+          <span class="modal-tip-text"><strong>Use Auto Layout</strong> on frames (and nested frames). Flex/grid mapping is most accurate when layout is not “None”.</span>
+        </li>
+        <li>
+          <span class="modal-tip-icon" aria-hidden="true"><i class="fa-solid fa-image"></i></span>
+          <span class="modal-tip-text"><strong>Use real image assets</strong> for photos, illustrations, and icons. Prefer IMAGE fills or vectors—not nested frames/groups that only look like images. Sites usually ship fixed assets, not deep layout trees for every graphic.</span>
+        </li>
+        <li>
+          <span class="modal-tip-icon" aria-hidden="true"><i class="fa-solid fa-vector-square"></i></span>
+          <span class="modal-tip-text"><strong>Flatten decorative shapes</strong> when possible (boolean ops / vectors). Complex nested groups export less cleanly than a single SVG or PNG.</span>
+        </li>
+        <li>
+          <span class="modal-tip-icon" aria-hidden="true"><i class="fa-solid fa-font"></i></span>
+          <span class="modal-tip-text"><strong>Name layers clearly</strong> (e.g. <code>hero-image</code>, <code>icon-arrow</code>). Names become CSS classes and asset filenames in the ZIP.</span>
+        </li>
+        <li>
+          <span class="modal-tip-icon" aria-hidden="true"><i class="fa-solid fa-crop-simple"></i></span>
+          <span class="modal-tip-text"><strong>Enable Clip content</strong> on frames that should mask overflow (rounded cards, image crops). This maps to CSS overflow / clip-path.</span>
+        </li>
+        <li>
+          <span class="modal-tip-icon" aria-hidden="true"><i class="fa-solid fa-object-group"></i></span>
+          <span class="modal-tip-text"><strong>Select one root frame</strong> with auto layout or grid. Export one composition at a time for the best structure.</span>
+        </li>
+      </ul>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="modal-btn modal-btn-secondary" id="export-checklist-cancel">Cancel</button>
+      <button type="button" class="modal-btn modal-btn-primary" id="export-checklist-confirm">Continue export</button>
     </div>
   </div>
 </div>
@@ -705,6 +880,27 @@
     }
   }
 
+  function escapeStatusHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function formatExportStatusHtml(message) {
+    var msg = message || 'Exporting…';
+    // "Encoding asset 33/65… vector-11.svg" → primary + muted detail
+    var m = msg.match(/^(.*(?:…|\.\.\.))\s+(.+)$/);
+    if (m) {
+      return (
+        '<span class="export-status-primary">' + escapeStatusHtml(m[1]) + '</span> ' +
+        '<span class="export-status-detail">' + escapeStatusHtml(m[2]) + '</span>'
+      );
+    }
+    return '<span class="export-status-primary">' + escapeStatusHtml(msg) + '</span>';
+  }
+
   function setExportStatus(message, percent) {
     var wrap = document.getElementById('export-status');
     var text = document.getElementById('export-status-text');
@@ -712,7 +908,7 @@
     var meta = document.getElementById('export-status-meta');
     if (!wrap || !text || !bar || !meta) return;
     wrap.classList.add('visible');
-    text.textContent = message || 'Exporting…';
+    text.innerHTML = formatExportStatusHtml(message);
     var pct = typeof percent === 'number' && !isNaN(percent)
       ? Math.max(0, Math.min(100, Math.round(percent)))
       : 0;
@@ -929,11 +1125,54 @@
     };
   });
 
-  document.getElementById('export').onclick = function() {
+  function openExportChecklistModal() {
+    var overlay = document.getElementById('export-checklist-modal');
+    if (!overlay) return;
+    overlay.hidden = false;
+    overlay.classList.add('visible');
+    var confirmBtn = document.getElementById('export-checklist-confirm');
+    if (confirmBtn) confirmBtn.focus();
+  }
+
+  function closeExportChecklistModal() {
+    var overlay = document.getElementById('export-checklist-modal');
+    if (!overlay) return;
+    overlay.classList.remove('visible');
+    overlay.hidden = true;
+  }
+
+  function startExport() {
+    closeExportChecklistModal();
     setExportLoading(true);
     setExportStatus('Starting export…', 0);
     parent.postMessage({ pluginMessage: { type: 'export' } }, '*');
+  }
+
+  document.getElementById('export').onclick = function() {
+    if (document.getElementById('export').classList.contains('loading')) return;
+    openExportChecklistModal();
   };
+
+  document.getElementById('export-checklist-cancel').onclick = function() {
+    closeExportChecklistModal();
+  };
+
+  document.getElementById('export-checklist-confirm').onclick = function() {
+    startExport();
+  };
+
+  document.getElementById('export-checklist-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeExportChecklistModal();
+  });
+
+  document.addEventListener('keydown', function(e) {
+    var overlay = document.getElementById('export-checklist-modal');
+    if (!overlay || !overlay.classList.contains('visible')) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeExportChecklistModal();
+    }
+  });
 
   document.getElementById('download-zip').onclick = function() {
     var output = document.getElementById('output').value;

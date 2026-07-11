@@ -8,7 +8,7 @@ Figma plugin that exports a selected **auto-layout or grid frame** to **HTML + C
 
 - Plugin name in Figma: **Figma to Codes**
 - Source entry: `src/main.ts` (bundled to `code.js` via esbuild)
-- UI: `ui.html` (370×500)
+- UI: `ui.html` (370×600)
 
 ## Repository map
 
@@ -22,7 +22,7 @@ Figma plugin that exports a selected **auto-layout or grid frame** to **HTML + C
 | `src/assets/` | Image/SVG asset registration |
 | `src/utils/` | Names, color/rem, HTML helpers |
 | `code.js` | Bundled output Figma loads (gitignored) — do not edit by hand |
-| `ui.html` | Plugin UI (export, preview, HTML/CSS/Assets panels, ZIP, progress) |
+| `ui.html` | Plugin UI (export checklist modal, preview, HTML/CSS/Assets panels, ZIP, progress) |
 | `manifest.json` | Figma plugin manifest (`main: code.js`) |
 | `tsconfig.json` | Typecheck only (`noEmit`); includes `@figma/plugin-typings` |
 | `previews/html/` | Local HTML/CSS preview samples |
