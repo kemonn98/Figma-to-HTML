@@ -27,7 +27,7 @@ _(none)_
 
 ## 1.5.3 — 2026-07-11
 
-**Commit:** _(pending)_
+**Commit:** `467aa06`
 
 - Solid `color` / `background` styles use shared color utilities (`text-black-50`, `text-white-90`, `bg-c-0835ff`) instead of the first layer’s name
 - Info icon next to Export opens guidelines; “Don’t show this again” persists via `figma.clientStorage`
