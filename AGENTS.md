@@ -18,17 +18,18 @@ Figma plugin that exports a selected **auto-layout or grid frame** to **HTML + C
 | `src/types.ts` | Shared export types (`ExportContext`, `ExportResult`, …) |
 | `src/export/` | Selection export + progress reporting |
 | `src/convert/` | Node → HTML dispatcher and per-type converters |
-| `src/styles/` | Fills, strokes, effects, mask, layout, position, CSS classes |
+| `src/styles/` | Fills, strokes, effects, mask, layout, position, CSS classes, variables |
 | `src/assets/` | Image/SVG asset registration |
-| `src/utils/` | Names, color/rem, HTML helpers |
+| `src/utils/` | Names, color/rem, HTML helpers, transform (flip/rotate) |
 | `code.js` | Bundled output Figma loads (gitignored) — do not edit by hand |
-| `ui.html` | Plugin UI (checklist modal + info icon, always-visible HTML/CSS/Assets tabs, preview, ZIP, progress) |
+| `ui.html` | Plugin UI (checklist + Readme modals, pro tips during export, HTML/CSS/Assets tabs, preview, ZIP, progress) |
 | `manifest.json` | Figma plugin manifest (`main: code.js`) |
 | `tsconfig.json` | Typecheck only (`noEmit`); includes `@figma/plugin-typings` |
 | `previews/html/` | Local HTML/CSS preview samples |
 | `README.md` | Feature and mapping documentation |
 | `AGENTS.md` | Agent conventions and commands |
 | `VERSION.md` | Changelog and current version |
+| `FEATURE-CHECKLIST.md` | Figma feature coverage (Done / Partial / Planned / Out of scope) |
 | `.cursor/rules/` | Always-on Cursor rules (project context, git push release) |
 
 ## Commands
@@ -50,7 +51,7 @@ After changing anything under `src/`, always rebuild (`npm run build` or keep `w
 - Export entry: `exportSelection()` → recursive `nodeToHtmlCss(...)` in `src/convert/node.ts`.
 - Result includes `assets` (base64) for ZIP/`assets/` files; preview rewrites asset paths to data URLs.
 - Styling: utility classes (gap/padding snapped to **4px** then **rem**; font-size in rem) + shared tokens (`text-black-50`, `opacity-60`, `rounded-8`, `shadow-inset-1-white-10`, `bg-grad-*` / `text-grad-*` via `color-tokens` / `style-tokens`); omit defaults (`justify-start`, `text-left`, `font-400`, `tracking-0`); always emit `items-start` (CSS `align-items` defaults to stretch); positioning stays inline. Absolute nodes keep `position: absolute` (do not overwrite with relative for containing block).
-- Skip invisible nodes (`visible === false` or `opacity < 0.01`); skip empty mask sources; semantic tags for Button/Link layers only (`src/convert/semantics.ts`); all text → `<p>` (no heading tags).
+- Skip invisible nodes (`visible === false` or `opacity < 0.01`); skip empty mask sources; semantic tags for Button/Link layers only (`src/convert/semantics.ts`); all text → `<p>` (no heading tags); text truncation → `truncate` / `line-clamp-N`.
 - Icon fonts (including Font Awesome) → SVG file in `assets/` via `exportAsync` + `<img>` (no FA CDN in export).
 - Vectors export as `assets/*.svg` (referenced with `<img>`), not inlined markup; simple H/V dividers → CSS border.
 - Layer-derived CSS class names must not start with a digit (prefix `N…`).
@@ -81,6 +82,10 @@ Order: inspect diffs → bump `VERSION.md` + `package.json` → update `README.m
 9. **HTML + CSS only** — no React/JSX export path.
 10. **Images and SVGs** go to `assets/` in the ZIP; do not leave `#e5e7eb` placeholders when `getImageByHash` succeeds; do not inline SVG markup.
 11. **Spacing** utilities use `snapPx(4)` then `pxToRem` (base 16). Font-size uses `pxToRem` without snap.
+12. **Corner smoothing** has no standard CSS equivalent — do not approximate; use geometric `border-radius` only.
+13. **Layer / background blur** use Figma’s radius directly (`figmaBlurToCssPx`); do not divide by 2.
+14. **Rotate/flip** use `transform-origin: center` + AABB-centered left/top (`src/utils/transform.ts`). Do not use top-left origin for visual export.
+15. **FILL + max-width/height** under a parent with `items-center` or `items-end`: emit `w-full`/`h-full`, not `self-stretch` (stretch + max-size pins the box to the start).
 
 ## When changing export behavior
 
@@ -92,3 +97,4 @@ Order: inspect diffs → bump `VERSION.md` + `package.json` → update `README.m
 
 - [Figma Plugin API](https://www.figma.com/plugin-docs/)
 - Local docs: `README.md` (node type table, layout mapping, styling approach)
+- Coverage checklist: `FEATURE-CHECKLIST.md` (what we map vs out of scope for static HTML/CSS)

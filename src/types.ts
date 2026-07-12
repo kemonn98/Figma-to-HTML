@@ -41,6 +41,8 @@ export type ExportContext = {
   assets: ExportAssetInternal[];
   assetNameCounts: Map<string, number>;
   imageHashToFile: Map<string, string>;
+  /** Collected Figma variables → CSS custom properties (`--token: value`). */
+  cssVariables: Map<string, string>;
   rootNode: SceneNode | null;
   rootHeight: number;
   isRootPass: boolean;

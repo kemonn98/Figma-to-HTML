@@ -1,6 +1,7 @@
 import { toCssColor, roundDim, roundPx } from '../utils/color';
-import type { FigmaGradientPaint, FigmaMaskType } from '../types';
+import type { ExportContext, FigmaGradientPaint, FigmaMaskType } from '../types';
 import { gradientTransformToRadialCss, gradientTransformToConicCss, linearGradientToCss } from './fills';
+import { decodeSvgBytes, normalizeSvgToNodeSize, registerSvgAsset } from '../assets/svg';
 
 /** Figma mask: a node with isMask=true masks all of its subsequent siblings. */
 export const isMaskNode = (node: SceneNode): boolean =>
@@ -123,4 +124,49 @@ export const getClipPathFromMaskNode = (node: SceneNode): string | null => {
     return 'inset(0)';
   }
   return null;
+};
+
+const isVectorLikeMask = (node: SceneNode): boolean =>
+  node.type === 'VECTOR' ||
+  node.type === 'BOOLEAN_OPERATION' ||
+  node.type === 'STAR' ||
+  node.type === 'POLYGON' ||
+  node.type === 'LINE';
+
+/**
+ * Apply mask shape to wrapper styles: clip-path for rect/ellipse/frames,
+ * gradient mask-image when present, and SVG mask-image for vector/boolean masks.
+ */
+export const appendMaskWrapperStyles = async (
+  maskNode: SceneNode,
+  styles: string[],
+  context: ExportContext
+): Promise<void> => {
+  const clipPath = getClipPathFromMaskNode(maskNode);
+  if (clipPath) styles.push(`clip-path: ${clipPath}`);
+  styles.push(...getMaskImageStyles(maskNode));
+
+  if (clipPath || getMaskImageFromMaskNode(maskNode)) return;
+  if (!isVectorLikeMask(maskNode)) return;
+
+  try {
+    const exportable = maskNode as SceneNode & ExportMixin;
+    const svgBytes = await exportable.exportAsync({ format: 'SVG' });
+    let svgText = decodeSvgBytes(svgBytes);
+    svgText = normalizeSvgToNodeSize(svgText, maskNode.width, maskNode.height);
+    const svgPath = registerSvgAsset(`${maskNode.name || 'mask'}-mask`, svgText, context);
+    const url = `url("${svgPath}")`;
+    styles.push(
+      `mask-image: ${url}`,
+      `-webkit-mask-image: ${url}`,
+      'mask-size: 100% 100%',
+      'mask-position: 0 0',
+      'mask-repeat: no-repeat',
+      '-webkit-mask-size: 100% 100%',
+      '-webkit-mask-position: 0 0',
+      '-webkit-mask-repeat: no-repeat'
+    );
+  } catch {
+    // overflow:hidden on wrapper remains as fallback
+  }
 };

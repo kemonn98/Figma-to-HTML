@@ -8,6 +8,7 @@ import {
   countExportableNodes,
   countUniqueImageHashes,
 } from './progress';
+import { buildCssVariablesBlock } from '../styles/variables';
 
 export const exportSelection = async (): Promise<ExportResult> => {
   await reportExportProgress('Loading page…', 1);
@@ -42,6 +43,7 @@ export const exportSelection = async (): Promise<ExportResult> => {
     assets: [],
     assetNameCounts: new Map<string, number>(),
     imageHashToFile: new Map<string, string>(),
+    cssVariables: new Map<string, string>(),
     rootNode,
     rootHeight: rootNode.height,
     isRootPass: true,
@@ -64,6 +66,7 @@ export const exportSelection = async (): Promise<ExportResult> => {
   const css =
     `html { font-size: ${REM_BASE}px; }\n` +
     `body, p { margin: 0; }\n\n` +
+    buildCssVariablesBlock(context) +
     context.styleEntries
       .sort((a, b) => {
         const baseCompare = a.baseName.localeCompare(b.baseName);

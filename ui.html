@@ -297,6 +297,7 @@
     border-radius: 999px;
     background: #262626;
     overflow: hidden;
+    margin-top: 10px;
   }
   .export-status-bar {
     height: 100%;
@@ -304,6 +305,54 @@
     border-radius: 999px;
     background: #0835ff;
     transition: width 0.2s ease;
+  }
+  .export-protip {
+    display: none;
+    width: 100%;
+    max-width: 320px;
+    margin: 10px auto 0;
+    text-align: center;
+  }
+  .export-protip.visible {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .export-protip-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #525252;
+  }
+  .export-protip-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    transition: opacity 0.15s ease;
+  }
+  .export-protip-body.is-fading {
+    opacity: 0;
+  }
+  .hero .export-protip-title,
+  .export-protip-title {
+    margin: 8px;
+    padding: 0;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.3;
+    color: #ffffff;
+  }
+  .hero .export-protip-desc,
+  .export-protip-desc {
+    margin: 0;
+    padding: 0;
+    font-size: 11px;
+    line-height: 1.35;
+    color: #737373;
   }
   @keyframes dot-bounce {
     0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
@@ -519,19 +568,51 @@
     line-height: 1.4;
     color: #525252;
   }
-  .plugin-credit a {
+  .plugin-credit a,
+  .plugin-credit button.plugin-credit-link {
     color: #a3a3a3;
     text-decoration: none;
     transition: color 0.15s;
   }
-  .plugin-credit a:hover {
+  .plugin-credit a:hover,
+  .plugin-credit button.plugin-credit-link:hover {
     color: #e5e5e5;
     text-decoration: underline;
   }
-  .plugin-credit a:focus-visible {
+  .plugin-credit a:focus-visible,
+  .plugin-credit button.plugin-credit-link:focus-visible {
     outline: 2px solid #525252;
     outline-offset: 2px;
     border-radius: 2px;
+  }
+  .plugin-credit-sep {
+    margin: 0 6px;
+    color: #404040;
+  }
+  .plugin-credit-link {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+  .modal-readme-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px 0 8px;
+  }
+  .modal-readme-body p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #a3a3a3;
+    text-align: left;
+  }
+  .modal-readme-body p strong {
+    color: #e5e5e5;
+    font-weight: 500;
   }
 
   .toast {
@@ -721,7 +802,7 @@
     <div class="hero-inner">
       <div class="hero-title">
         <h1>Figma to Codes</h1>
-        <span class="version-capsule" title="Plugin version">v1.5.5</span>
+        <span class="version-capsule" title="Plugin version">v1.5.6</span>
       </div>
       <p>Select an auto-layout frame, then export.</p>
       <div class="export-actions">
@@ -744,6 +825,13 @@
         </div>
         <div class="export-status-track" aria-hidden="true">
           <div class="export-status-bar" id="export-status-bar"></div>
+        </div>
+      </div>
+      <div class="export-protip" id="export-protip" aria-live="polite">
+        <span class="export-protip-label">Pro tip</span>
+        <div class="export-protip-body" id="export-protip-body">
+          <p class="export-protip-title" id="export-protip-title"></p>
+          <p class="export-protip-desc" id="export-protip-desc"></p>
         </div>
       </div>
       <div id="preview-canvas-wrap" class="preview-canvas-wrap" aria-live="polite">
@@ -815,6 +903,8 @@
       </footer>
       <p class="plugin-credit">
         Plugin by <a href="https://slabpixel.com" target="_blank" rel="noopener noreferrer">SlabPixel</a>
+        <span class="plugin-credit-sep" aria-hidden="true">·</span>
+        <button type="button" class="plugin-credit-link" id="open-readme" aria-haspopup="dialog">Readme</button>
       </p>
     </div>
   </div>
@@ -861,6 +951,33 @@
     <div class="modal-footer">
       <button type="button" class="modal-btn modal-btn-secondary" id="export-checklist-cancel">Cancel</button>
       <button type="button" class="modal-btn modal-btn-primary" id="export-checklist-confirm">Continue export</button>
+    </div>
+  </div>
+</div>
+
+<div id="readme-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="readme-modal-title" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="readme-modal-title">Why this exists</h2>
+      <p class="modal-subtitle">Figma to Codes — intent, not a silver bullet.</p>
+    </div>
+    <div class="modal-body">
+      <div class="modal-readme-body">
+        <p>
+          <strong>Built for vibe coding.</strong>
+          Export gives you a readable HTML/CSS sketch of your Figma layout so AI (and you) can grasp structure, spacing, hierarchy, and assets—without rebuilding the frame from screenshots alone.
+        </p>
+        <p>
+          <strong>Not a 100% Figma → production generator.</strong>
+          Expect a solid starting point for context and iteration, not pixel-perfect ship-ready code for every edge case. Polish, semantics, and product logic still belong in your workflow.
+        </p>
+        <p>
+          Best results come from Auto Layout, clear layer names, and real image/vector assets. Use the guidelines (info icon) before export when you want cleaner output.
+        </p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="modal-btn modal-btn-secondary" id="readme-modal-close" style="flex: 1">Got it</button>
     </div>
   </div>
 </div>
@@ -985,13 +1102,103 @@
     return '<span class="export-status-primary">' + escapeStatusHtml(msg) + '</span>';
   }
 
+  var EXPORT_PROTIPS = [
+    {
+      q: 'Why is image export slow?',
+      a: 'Each unique IMAGE fill is read and encoded into the ZIP. More assets = longer wait.'
+    },
+    {
+      q: 'Why does layout look messy?',
+      a: 'Use Auto Layout (or grid) on frames. Absolute-only / “None” layouts are harder to map to clean HTML.'
+    },
+    {
+      q: 'Names matter.',
+      a: 'Layer names become CSS classes and asset filenames (e.g. hero-image, icon-arrow).'
+    },
+    {
+      q: 'Prefer real assets.',
+      a: 'Photos and icons should be IMAGE fills or vectors—not deep nested frames that only look like images.'
+    },
+    {
+      q: 'Flatten decorative shapes.',
+      a: 'Boolean ops / single vectors export cleaner than many nested groups for ornaments.'
+    },
+    {
+      q: 'Clip content when masking.',
+      a: 'Enable Clip content on rounded cards and image crops so overflow maps to CSS correctly.'
+    },
+    {
+      q: 'One root at a time.',
+      a: 'Select a single auto-layout or grid frame for the most predictable structure.'
+    },
+    {
+      q: 'Icon fonts become SVG.',
+      a: 'Font Awesome and similar icons are exported as SVG files—that step can take a moment.'
+    },
+    {
+      q: 'Corner smoothing.',
+      a: 'Figma’s corner smoothing has no standard CSS equivalent—export uses regular border-radius.'
+    },
+    {
+      q: 'Static HTML & CSS only.',
+      a: 'Prototype interactions, animations, and sticky scroll behavior are out of scope for this export.'
+    }
+  ];
+  var exportProtipTimer = null;
+  var exportProtipIndex = 0;
+
+  function renderExportProtip(index, animate) {
+    var body = document.getElementById('export-protip-body');
+    var titleEl = document.getElementById('export-protip-title');
+    var descEl = document.getElementById('export-protip-desc');
+    if (!body || !titleEl || !descEl || !EXPORT_PROTIPS.length) return;
+    var tip = EXPORT_PROTIPS[index % EXPORT_PROTIPS.length];
+    var apply = function() {
+      titleEl.textContent = tip.q;
+      descEl.textContent = tip.a;
+    };
+    if (!animate) {
+      body.classList.remove('is-fading');
+      apply();
+      return;
+    }
+    body.classList.add('is-fading');
+    setTimeout(function() {
+      apply();
+      body.classList.remove('is-fading');
+    }, 150);
+  }
+
+  function startExportProtips() {
+    stopExportProtips();
+    var wrap = document.getElementById('export-protip');
+    if (wrap) wrap.classList.add('visible');
+    exportProtipIndex = Math.floor(Math.random() * EXPORT_PROTIPS.length);
+    renderExportProtip(exportProtipIndex, false);
+    exportProtipTimer = setInterval(function() {
+      exportProtipIndex = (exportProtipIndex + 1) % EXPORT_PROTIPS.length;
+      renderExportProtip(exportProtipIndex, true);
+    }, 5500);
+  }
+
+  function stopExportProtips() {
+    if (exportProtipTimer) {
+      clearInterval(exportProtipTimer);
+      exportProtipTimer = null;
+    }
+    var wrap = document.getElementById('export-protip');
+    if (wrap) wrap.classList.remove('visible');
+  }
+
   function setExportStatus(message, percent) {
     var wrap = document.getElementById('export-status');
     var text = document.getElementById('export-status-text');
     var bar = document.getElementById('export-status-bar');
     var meta = document.getElementById('export-status-meta');
     if (!wrap || !text || !bar || !meta) return;
+    var wasVisible = wrap.classList.contains('visible');
     wrap.classList.add('visible');
+    if (!wasVisible) startExportProtips();
     text.innerHTML = formatExportStatusHtml(message);
     var pct = typeof percent === 'number' && !isNaN(percent)
       ? Math.max(0, Math.min(100, Math.round(percent)))
@@ -1001,6 +1208,7 @@
   }
 
   function clearExportStatus() {
+    stopExportProtips();
     var wrap = document.getElementById('export-status');
     var bar = document.getElementById('export-status-bar');
     var meta = document.getElementById('export-status-meta');
@@ -1258,6 +1466,32 @@
     overlay.hidden = true;
   }
 
+  function openReadmeModal() {
+    var overlay = document.getElementById('readme-modal');
+    if (!overlay) return;
+    overlay.hidden = false;
+    overlay.classList.add('visible');
+    var closeBtn = document.getElementById('readme-modal-close');
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function closeReadmeModal() {
+    var overlay = document.getElementById('readme-modal');
+    if (!overlay) return;
+    overlay.classList.remove('visible');
+    overlay.hidden = true;
+  }
+
+  document.getElementById('open-readme').onclick = function() {
+    openReadmeModal();
+  };
+  document.getElementById('readme-modal-close').onclick = function() {
+    closeReadmeModal();
+  };
+  document.getElementById('readme-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeReadmeModal();
+  });
+
   function startExport() {
     closeExportChecklistModal();
     setExportLoading(true);
@@ -1293,12 +1527,17 @@
   });
 
   document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    var readme = document.getElementById('readme-modal');
+    if (readme && readme.classList.contains('visible')) {
+      e.preventDefault();
+      closeReadmeModal();
+      return;
+    }
     var overlay = document.getElementById('export-checklist-modal');
     if (!overlay || !overlay.classList.contains('visible')) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      closeExportChecklistModal();
-    }
+    e.preventDefault();
+    closeExportChecklistModal();
   });
 
   // Ask main thread for prefs in case the initial prefs message was missed

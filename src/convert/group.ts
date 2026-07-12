@@ -1,10 +1,11 @@
 import type { ConvertParams, ExportNode } from '../types';
-import { roundPx, roundDim, isMeaningfulRotation, cssRotationDeg } from '../utils/color';
+import { roundPx, roundDim } from '../utils/color';
+import { appendNodeTransformStyles } from '../utils/transform';
 import { getClassAttr, getStyleAttr } from '../utils/html';
-import { getFillStyle, getCornerRadiusStyle } from '../styles/fills';
+import { getCornerRadiusStyle, appendStackedFillStyles } from '../styles/fills';
 import { getStrokeStyles } from '../styles/strokes';
 import { getEffectsStyles, mapBlendMode } from '../styles/effects';
-import { isMaskNode, getClipPathFromMaskNode, getMaskImageStyles } from '../styles/mask';
+import { isMaskNode, appendMaskWrapperStyles } from '../styles/mask';
 import {
   getGroupChildPositionStyles,
   getAbsolutePositionStyles,
@@ -12,7 +13,7 @@ import {
   shouldAddRelativeStacking,
 } from '../styles/position';
 import { assignStyleClasses, splitInlineVsClassStyles } from '../styles/classes';
-import { hasImageFill, registerImageAsset } from '../assets/images';
+import { hasImageFill } from '../assets/images';
 import { semanticContainerTag, semanticContainerOpenAttrs } from './semantics';
 
 export const convertGroup = async ({
@@ -70,20 +71,14 @@ export const convertGroup = async ({
     inlineStyles.push('position: relative');
   }
   if ('fills' in group && group.fills !== figma.mixed && !isMaskNode(group)) {
-    const fill = getFillStyle(group as unknown as GeometryMixin);
-    if (fill) inlineStyles.push(`background: ${fill}`);
-    else if (hasImageFill(group as unknown as GeometryMixin)) {
-      const gImg = await registerImageAsset(group as unknown as SceneNode & GeometryMixin, context);
-      if (gImg) {
-        inlineStyles.push(
-          `background-image: url("${gImg}")`,
-          'background-size: cover',
-          'background-position: center',
-          'background-repeat: no-repeat'
-        );
-      } else {
-        inlineStyles.push('background: #e5e7eb');
-      }
+    await appendStackedFillStyles(group as unknown as SceneNode & GeometryMixin, inlineStyles, context, {
+      nameHint: group.name,
+    });
+    if (
+      !inlineStyles.some((s) => s.startsWith('background')) &&
+      hasImageFill(group as unknown as GeometryMixin)
+    ) {
+      inlineStyles.push('background: #e5e7eb');
     }
   }
   if ('strokes' in group && Array.isArray((group as { strokes?: unknown }).strokes)) {
@@ -99,9 +94,7 @@ export const convertGroup = async ({
   if (group.opacity < 1) inlineStyles.push(`opacity: ${roundPx(group.opacity)}`);
   const groupBlend = 'blendMode' in group ? mapBlendMode(group.blendMode) : null;
   if (groupBlend && groupBlend !== 'normal') inlineStyles.push(`mix-blend-mode: ${groupBlend}`);
-  if (isMeaningfulRotation(group.rotation) && !inlineStyles.some((s) => s.startsWith('transform:'))) {
-    inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(group.rotation)}deg)`);
-  }
+  appendNodeTransformStyles(inlineStyles, group);
 
   const split = splitInlineVsClassStyles(inlineStyles);
   inlineStyles.length = 0;
@@ -125,7 +118,6 @@ export const convertGroup = async ({
   while (gi < groupChildren.length) {
     const child = groupChildren[gi];
     if (isMaskNode(child)) {
-      const clipPath = getClipPathFromMaskNode(child);
       let k = gi + 1;
       while (k < groupChildren.length && !isMaskNode(groupChildren[k])) k++;
       const maskedCount = k - gi - 1;
@@ -137,8 +129,7 @@ export const convertGroup = async ({
           'position: absolute',
           'overflow: hidden',
         ];
-        if (clipPath) wrapperStyles.push(`clip-path: ${clipPath}`);
-        wrapperStyles.push(...getMaskImageStyles(child));
+        await appendMaskWrapperStyles(child, wrapperStyles, context);
         wrapperStyles.push(...getPositionStylesRelativeToContainer(child, group, gi + 1));
         const innerIndent = '  '.repeat(baseIndent + indent + 1);
         html += '\n' + innerIndent + `<div ${getClassAttr([])}${getStyleAttr(wrapperStyles)}>`;

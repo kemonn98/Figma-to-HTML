@@ -1,5 +1,7 @@
 import { toCssColor, roundDim } from '../utils/color';
-import type { FigmaGradientPaint } from '../types';
+import type { ExportContext, FigmaGradientPaint } from '../types';
+import { imagePaintToBgLayer, registerImageByHash } from '../assets/images';
+import { solidPaintToCssWithVariable } from './variables';
 
 export const getLayerBlurRadius = (node: BlendMixin): number => {
   if (!('effects' in node) || !node.effects.length) return 0;
@@ -226,8 +228,25 @@ export const gradientTransformToLinearCss = (t: Transform): string => {
   return `${normalized}deg`;
 };
 
-/** Radial: transform maps gradient space to layer. Use center (tx,ty) and scale for size. */
+/**
+ * Radial: invert gradientTransform to place center + radii in normalized object space.
+ * Falls back to translation/scale magnitudes when invert fails.
+ */
 export const gradientTransformToRadialCss = (t: Transform): string => {
+  const inv = invertTransform(t);
+  if (inv) {
+    const center = applyTransform(inv, 0.5, 0.5);
+    const edgeX = applyTransform(inv, 1, 0.5);
+    const edgeY = applyTransform(inv, 0.5, 1);
+    const rx = Math.hypot(edgeX.x - center.x, edgeX.y - center.y);
+    const ry = Math.hypot(edgeY.x - center.x, edgeY.y - center.y);
+    const cx = Math.round(center.x * 100);
+    const cy = Math.round(center.y * 100);
+    const rxPct = Math.max(1, Math.round(rx * 100));
+    const ryPct = Math.max(1, Math.round(ry * 100));
+    if (Math.abs(rxPct - ryPct) < 5) return `circle ${rxPct}% at ${cx}% ${cy}%`;
+    return `ellipse ${rxPct}% ${ryPct}% at ${cx}% ${cy}%`;
+  }
   const tx = t[0][2];
   const ty = t[1][2];
   const scaleX = Math.sqrt(t[0][0] * t[0][0] + t[1][0] * t[1][0]);
@@ -294,7 +313,7 @@ export const paintToCssBackground = (
   }
 };
 
-/** First visible fill as CSS background: solid or gradient. */
+/** First visible fill as CSS background: solid or gradient (no images). Prefer appendStackedFillStyles for full fidelity. */
 export const getFillStyle = (node: GeometryMixin): string | null => {
   if (!('fills' in node) || node.fills === figma.mixed) return null;
   const fill = node.fills.find((p) => p.visible !== false) as SolidPaint | FigmaGradientPaint | undefined;
@@ -331,9 +350,135 @@ export const getFillStyleFromPaints = (
   return null;
 };
 
-export const getCornerRadiusStyle = (node: SceneNode) => {
-  if ('cornerRadius' in node && node.cornerRadius !== figma.mixed && typeof node.cornerRadius === 'number' && node.cornerRadius > 0) {
-    return `border-radius: ${roundDim(node.cornerRadius)}px`;
+export const getCornerRadiusStyle = (node: SceneNode): string | null => {
+  if (!('cornerRadius' in node) && !('topLeftRadius' in node)) return null;
+  if ('cornerRadius' in node && node.cornerRadius !== figma.mixed && typeof node.cornerRadius === 'number') {
+    if (node.cornerRadius > 0) return `border-radius: ${roundDim(node.cornerRadius)}px`;
+    return null;
+  }
+  if ('topLeftRadius' in node) {
+    const n = node as SceneNode & {
+      topLeftRadius?: number;
+      topRightRadius?: number;
+      bottomRightRadius?: number;
+      bottomLeftRadius?: number;
+    };
+    const tl = roundDim(n.topLeftRadius ?? 0);
+    const tr = roundDim(n.topRightRadius ?? 0);
+    const br = roundDim(n.bottomRightRadius ?? 0);
+    const bl = roundDim(n.bottomLeftRadius ?? 0);
+    if (tl || tr || br || bl) {
+      if (tl === tr && tr === br && br === bl) return `border-radius: ${tl}px`;
+      return `border-radius: ${tl}px ${tr}px ${br}px ${bl}px`;
+    }
   }
   return null;
+};
+
+/**
+ * Stack all visible fills (Figma bottom→top) as CSS backgrounds (CSS first = top → reverse array).
+ * When asImgIfSoleImage and only one IMAGE fill, returns path for an <img> instead.
+ */
+export const appendStackedFillStyles = async (
+  node: SceneNode & GeometryMixin,
+  inlineStyles: string[],
+  context: ExportContext,
+  opts?: { asImgIfSoleImage?: boolean; nameHint?: string }
+): Promise<{ imageSrcForImgTag: string | null }> => {
+  if (!('fills' in node) || node.fills === figma.mixed || !node.fills.length) {
+    return { imageSrcForImgTag: null };
+  }
+  const visible = node.fills.filter((p) => p.visible !== false);
+  if (visible.length === 0) return { imageSrcForImgTag: null };
+
+  const soleImage =
+    !!opts?.asImgIfSoleImage &&
+    visible.length === 1 &&
+    visible[0].type === 'IMAGE' &&
+    !!(visible[0] as ImagePaint).imageHash;
+
+  if (soleImage) {
+    const paint = visible[0] as ImagePaint;
+    const path = await registerImageByHash(
+      paint.imageHash!,
+      opts?.nameHint || node.name || 'img',
+      context
+    );
+    return { imageSrcForImgTag: path };
+  }
+
+  const size = nodeGradientSize(node);
+  const cssOrder = [...visible].reverse();
+  const images: string[] = [];
+  const sizes: string[] = [];
+  const positions: string[] = [];
+  const repeats: string[] = [];
+
+  for (const paint of cssOrder) {
+    if (paint.type === 'SOLID') {
+      const color = await solidPaintToCssWithVariable(paint as SolidPaint, node, context);
+      images.push(`linear-gradient(${color}, ${color})`);
+      sizes.push('auto');
+      positions.push('0 0');
+      repeats.push('no-repeat');
+    } else if (
+      paint.type === 'GRADIENT_LINEAR' ||
+      paint.type === 'GRADIENT_RADIAL' ||
+      paint.type === 'GRADIENT_ANGULAR' ||
+      paint.type === 'GRADIENT_DIAMOND'
+    ) {
+      const g = paintToCssBackground(paint as FigmaGradientPaint, size);
+      if (!g) continue;
+      images.push(g);
+      sizes.push('auto');
+      positions.push('0 0');
+      repeats.push('no-repeat');
+    } else if (paint.type === 'IMAGE') {
+      const ip = paint as ImagePaint;
+      if (!ip.imageHash) continue;
+      const path = await registerImageByHash(
+        ip.imageHash,
+        opts?.nameHint || node.name || 'img',
+        context
+      );
+      if (!path) {
+        images.push('linear-gradient(#e5e7eb, #e5e7eb)');
+        sizes.push('auto');
+        positions.push('0 0');
+        repeats.push('no-repeat');
+        continue;
+      }
+      const layer = imagePaintToBgLayer(ip, path);
+      images.push(layer.image);
+      sizes.push(layer.size);
+      positions.push(layer.position);
+      repeats.push(layer.repeat);
+    }
+  }
+
+  if (images.length === 0) return { imageSrcForImgTag: null };
+
+  const solidOnly = visible.length === 1 && visible[0].type === 'SOLID';
+  if (solidOnly) {
+    const color = await solidPaintToCssWithVariable(visible[0] as SolidPaint, node, context);
+    inlineStyles.push(`background: ${color}`);
+    return { imageSrcForImgTag: null };
+  }
+
+  const gradientOnly =
+    visible.length === 1 &&
+    (visible[0].type === 'GRADIENT_LINEAR' ||
+      visible[0].type === 'GRADIENT_RADIAL' ||
+      visible[0].type === 'GRADIENT_ANGULAR' ||
+      visible[0].type === 'GRADIENT_DIAMOND');
+  if (gradientOnly) {
+    inlineStyles.push(`background: ${images[0]}`);
+    return { imageSrcForImgTag: null };
+  }
+
+  inlineStyles.push(`background-image: ${images.join(', ')}`);
+  inlineStyles.push(`background-size: ${sizes.join(', ')}`);
+  inlineStyles.push(`background-position: ${positions.join(', ')}`);
+  inlineStyles.push(`background-repeat: ${repeats.join(', ')}`);
+  return { imageSrcForImgTag: null };
 };

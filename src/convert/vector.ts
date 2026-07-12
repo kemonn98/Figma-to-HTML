@@ -1,5 +1,6 @@
 import type { ConvertParams, ExportNode } from '../types';
-import { roundPx, roundPx4, roundDim, isMeaningfulRotation, cssRotationDeg } from '../utils/color';
+import { roundPx, roundPx4, roundDim } from '../utils/color';
+import { appendNodeTransformStyles, getNodeTransformParts } from '../utils/transform';
 import { getClassAttr, getStyleAttr } from '../utils/html';
 import { getFillStyle } from '../styles/fills';
 import {
@@ -51,6 +52,10 @@ export const isCssDividerLine = (node: SceneNode): boolean => {
 
   const stroke = getStrokePaint(node as GeometryMixin);
   if (!stroke || stroke.type !== 'SOLID') return false;
+
+  // Exact dash patterns stay on SVG (stroke-dasharray); CSS borders only get generic dashed
+  const dash = getStrokeDashPattern(node);
+  if (dash && dash.length > 0) return false;
 
   const strokeW = Math.max(getStrokeWeight(node), 0.5);
   const boxW = Math.abs(node.width);
@@ -108,7 +113,7 @@ export const convertVector = async ({
   }
   let html = '';
       const classes: string[] = [];
-      const sizing = registerSizingUtilities(node, parentLayoutMode, context);
+      const sizing = registerSizingUtilities(node, parentLayoutMode, context, parentFrame);
       classes.push(...sizing.classes);
       const baseInlineStyles: string[] = [...sizing.styles];
       if (!baseInlineStyles.some((s) => s.startsWith('width:'))) {
@@ -169,9 +174,13 @@ export const convertVector = async ({
         return { html };
       }
 
-      const rotated = isMeaningfulRotation(node.rotation);
+      // SVG exportAsync already bakes rotation/flip into the asset; wrap with AABB only.
+      // CSS flip/rotate is for placeholder (non-SVG) fallbacks.
+      const { hasRotation, hasFlip } = getNodeTransformParts(node);
+      const rotatedOrFlipped = hasRotation || hasFlip;
       const aabb = node.absoluteBoundingBox;
-      const useAabbWrapper = rotated && aabb && typeof aabb.width === 'number' && typeof aabb.height === 'number';
+      const useAabbWrapper =
+        rotatedOrFlipped && aabb && typeof aabb.width === 'number' && typeof aabb.height === 'number';
       const container = positionContainer || parentGroup || parentFrame;
       const z = positionContainer
         ? flattenedZIndex
@@ -227,7 +236,7 @@ export const convertVector = async ({
         inlineStyles.push(...getStrokeStyles(node as GeometryMixin));
         if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
         if (!useAabbWrapper) {
-          if (isMeaningfulRotation(node.rotation)) inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(node.rotation)}deg)`);
+          appendNodeTransformStyles(inlineStyles, node);
         }
         html += buildVectorContent(inlineStyles, '');
       } else {
@@ -244,9 +253,7 @@ export const convertVector = async ({
           const svgPath = registerSvgAsset(node.name || node.type, svgText, context);
           const svgIndent = '  '.repeat(useAabbWrapper ? baseIndent + indent + 2 : baseIndent + indent + 1);
           const inlineStyles = [...baseInlineStyles];
-          if (!useAabbWrapper && isMeaningfulRotation(node.rotation)) {
-            inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(node.rotation)}deg)`);
-          }
+          // Do not CSS-flip SVG — export already includes flip/rotation visually
           html += buildVectorContent(inlineStyles, buildSvgImgHtml(svgPath, svgIndent));
         } catch (vectorErr) {
           const inlineStyles = [...baseInlineStyles];
@@ -261,8 +268,8 @@ export const convertVector = async ({
           }
           inlineStyles.push(...getStrokeStyles(node as GeometryMixin));
           if (node.opacity < 1) inlineStyles.push(`opacity: ${roundPx(node.opacity)}`);
-          if (!useAabbWrapper && isMeaningfulRotation(node.rotation)) {
-            inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(node.rotation)}deg)`);
+          if (!useAabbWrapper) {
+            appendNodeTransformStyles(inlineStyles, node);
           }
           html += buildVectorContent(inlineStyles, '');
         }

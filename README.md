@@ -31,13 +31,15 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 ## UI (ui.html)
 
 - **Header:** Title "Figma to Codes", version capsule, and short instructions.
-- **Export:** Opens a checklist modal (auto layout, assets, naming, clip tips) unless dismissed via “Don’t show this again” (`figma.clientStorage`); info icon reopens guidelines. After **Continue export**, shows a full-width status card (primary step + % in white, detail/filename in gray, 0–100% bar).
+- **Export:** Opens a checklist modal (auto layout, assets, naming, clip tips) unless dismissed via “Don’t show this again” (`figma.clientStorage`); info icon reopens guidelines. After **Continue export**, shows a full-width status card (primary step + % in white, detail/filename in gray, 0–100% bar) plus rotating **Pro tips** below the status card.
 - **Download ZIP:** Builds a ZIP with HTML, CSS, and exported files under `assets/` (PNG images and SVG vectors; export first if needed). Filename: `figma-export.zip`.
 - **Output panels:** Tabs for **HTML**, **CSS**, and **Assets** are visible on open (placeholders until export); then show code / asset list.
 - **Toasts:** Success/error only (e.g. "Export complete.", "Copied to clipboard.", "ZIP downloaded."); progress stays in the status card.
-- **Footer:** “Plugin by SlabPixel” with SlabPixel linking to https://slabpixel.com.
+- **Footer:** “Plugin by SlabPixel” (link) · **Readme** opens “Why this exists” (vibe-coding context for layout, not a 100% Figma→production generator).
 
 The plugin UI is 370×600px.
+
+Coverage of what maps to static HTML/CSS vs out of scope: [`FEATURE-CHECKLIST.md`](FEATURE-CHECKLIST.md).
 
 ---
 
@@ -57,7 +59,7 @@ Plugin logic lives under `src/` and is bundled to `code.js` with esbuild (`src/m
 | Figma node   | HTML element | What's exported |
 |-------------|-------------------|-----------------|
 | **Frame**   | `<div>` / `<button>` / `<a>` | Auto-layout → flex; grid → CSS grid; sizing; fills; image fills → `assets/*.png`; radius/strokes/effects; **Clip content**; rotation; absolute children. Layer names matching Button/Btn/CTA → `<button type="button">`; Link → `<a href="#">`. Root: `width: 100%`, `max-width`, `min-height`. |
-| **Text**    | `<p>` / `<img>` | All text → `<p>`. Icon fonts → `assets/*.svg` via `<img>`. Mixed fills → per-segment spans. |
+| **Text**    | `<p>` / `<img>` | All text → `<p>`. Truncate (`textTruncation: ENDING` / maxLines / fixed box) → `truncate` or `line-clamp-N` with ellipsis. Icon fonts → `assets/*.svg` via `<img>`. Mixed fills → per-segment spans. |
 | **Rectangle** | `<div>` (+ optional `<img>`) | Solid fill / image asset; corner radius; strokes; effects; sizing; position; rotation. |
 | **Vector / Line / Ellipse / Polygon / Star / Boolean operation** | `<div>` + `<img>` or border | Simple axis-aligned **LINE** / 2-point **VECTOR** dividers → CSS `border-top` / `border-left` (no SVG). Other shapes → `exportAsync` → `assets/*.svg`. |
 
@@ -99,12 +101,14 @@ Other node types are not converted.
 - **escapeHtml:** Escape special characters in text content.
 - **formatNegativeClassValue:** Class-safe value (e.g. negative padding → `neg-N` in class name).
 - **Font weight:** Inferred from font style string (e.g. "Bold" → 700, "Light" → 300).
-- **Fills:** `getSolidFill` (frames/rectangles), `getSolidTextFill` (text); `hasImageFill` for placeholder background when no solid fill.
-- **Strokes:** `getStrokePaint` / `getStrokeStyles` — solid → box-shadow inset (INSIDE), outline (OUTSIDE), or border (CENTER); gradient → border-image; dashed when dash pattern present. `hasInvisibleStrokesOnly` for vectors that become placeholders.
-- **Effects:** `getEffectsStyles` — drop shadow, inner shadow → box-shadow; layer blur → filter: blur().
+- **Fills:** `appendStackedFillStyles` (layered solids/gradients/images); `getSolidFill` / `getSolidTextFill`; image scale modes via `imagePaintToBgLayer`; bound COLOR variables → `:root` custom properties when present.
+- **Strokes:** `getStrokePaint` / `getStrokeStyles` — solid uniform → box-shadow inset (INSIDE), outline (OUTSIDE when excluded from layout), or border (CENTER / included); **individual** `strokeTop/Right/Bottom/LeftWeight` → `border-top` / …; gradient → border-image; dashed when dash pattern present (exact dash on vectors/SVG; CSS boxes get generic `dashed`). Extra solid strokes → stacked `box-shadow` rings.
+- **Effects:** `getEffectsStyles` — drop/inner shadow → box-shadow; layer blur → `filter: blur()` (full Figma radius); background blur → `backdrop-filter`. **Corner smoothing** has no standard CSS equivalent — export uses geometric `border-radius` only.
 - **Blend mode:** `mapBlendMode` → `mix-blend-mode` (only if not normal).
-- **Vectors:** `isVectorNode` (VECTOR, LINE, ELLIPSE, POLYGON, STAR, BOOLEAN_OPERATION); `exportAsync` → `assets/*.svg` referenced by `<img>` (not inlined).
-- **Layout:** `isAbsoluteChild` for absolute positioning vs `position: relative` + z-index for stacking.
+- **Vectors:** `isVectorNode` (VECTOR, LINE, ELLIPSE, POLYGON, STAR, BOOLEAN_OPERATION); `exportAsync` → `assets/*.svg` referenced by `<img>` (not inlined). Full ellipses prefer CSS `border-radius: 50%`.
+- **Masks:** rect/ellipse/frame → `clip-path`; gradient fills → `mask-image`; vector/boolean masks → SVG `mask-image`.
+- **Layout:** `isAbsoluteChild` for absolute positioning vs `position: relative` + z-index for stacking; min/max size; grid child span. FILL + `max-width` under parent `items-center|end` → `w-full` (not `self-stretch`).
+- **Transform:** flip H/V from `relativeTransform`; rotate/flip use `transform-origin: center` + AABB-centered position (`src/utils/transform.ts`).
 
 ### Output format
 

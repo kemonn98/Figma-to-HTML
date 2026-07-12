@@ -1,6 +1,6 @@
 {
   "name": "Figma-to-HTML",
-  "version": "1.5.5",
+  "version": "1.5.6",
   "description": "Your Figma Plugin",
   "main": "code.js",
   "scripts": {

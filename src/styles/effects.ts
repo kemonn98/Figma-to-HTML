@@ -1,10 +1,14 @@
 import { toCssColor, roundDim, roundPx } from '../utils/color';
 
+/** Figma blur radius → CSS blur (full radius; no /2 shrink). */
+export const figmaBlurToCssPx = (radius: number): number => roundPx(Math.max(0, radius));
+
 export const getEffectsStyles = (node: BlendMixin): string[] => {
   const styles: string[] = [];
   if (!('effects' in node) || node.effects.length === 0) return styles;
   const shadows: string[] = [];
-  let blur = 0;
+  let layerBlur = 0;
+  let backdropBlur = 0;
   for (const e of node.effects) {
     if (e.visible === false) continue;
     if (e.type === 'DROP_SHADOW') {
@@ -20,11 +24,17 @@ export const getEffectsStyles = (node: BlendMixin): string[] => {
       const spread = roundDim('spread' in e ? e.spread || 0 : 0);
       shadows.push(`inset ${roundDim(e.offset.x)}px ${roundDim(e.offset.y)}px ${roundDim(e.radius)}px ${spread}px ${color}`);
     } else if (e.type === 'LAYER_BLUR') {
-      blur = roundDim(e.radius);
+      layerBlur = Math.max(layerBlur, e.radius);
+    } else if (e.type === 'BACKGROUND_BLUR') {
+      backdropBlur = Math.max(backdropBlur, e.radius);
     }
   }
   if (shadows.length > 0) styles.push(`box-shadow: ${shadows.join(', ')}`);
-  if (blur > 0) styles.push(`filter: blur(${roundPx(blur / 2)}px)`);
+  if (layerBlur > 0) styles.push(`filter: blur(${figmaBlurToCssPx(layerBlur)}px)`);
+  if (backdropBlur > 0) {
+    const b = figmaBlurToCssPx(backdropBlur);
+    styles.push(`backdrop-filter: blur(${b}px)`, `-webkit-backdrop-filter: blur(${b}px)`);
+  }
   return styles;
 };
 

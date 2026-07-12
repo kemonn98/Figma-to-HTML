@@ -1,10 +1,11 @@
 import type { ConvertParams, ExportNode } from '../types';
-import { roundPx, roundDim, isMeaningfulRotation, cssRotationDeg } from '../utils/color';
+import { roundPx, roundDim } from '../utils/color';
+import { appendNodeTransformStyles } from '../utils/transform';
 import { getClassAttr, getStyleAttr } from '../utils/html';
-import { getFillStyle, getClipsContentStyles, getCornerRadiusStyle } from '../styles/fills';
+import { getClipsContentStyles, getCornerRadiusStyle, appendStackedFillStyles } from '../styles/fills';
 import { getStrokeStyles } from '../styles/strokes';
 import { getEffectsStyles, mapBlendMode } from '../styles/effects';
-import { isMaskNode, getClipPathFromMaskNode, getMaskImageStyles } from '../styles/mask';
+import { isMaskNode, appendMaskWrapperStyles } from '../styles/mask';
 import { registerSizingUtilities, registerGridUtilities, registerFlexUtilities } from '../styles/layout';
 import {
   getGroupChildPositionStyles,
@@ -14,7 +15,7 @@ import {
   hasPositionedStyle,
 } from '../styles/position';
 import { assignStyleClasses, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
-import { hasImageFill, registerImageAsset } from '../assets/images';
+import { hasImageFill } from '../assets/images';
 import { semanticContainerTag, semanticContainerOpenAttrs } from './semantics';
 
 export const convertFrame = async ({
@@ -49,10 +50,9 @@ export const convertFrame = async ({
       } else if (frame.layoutMode !== 'NONE') {
         classes.push(...registerFlexUtilities(frame, context));
       }
-      const sizing = registerSizingUtilities(frame, parentLayoutMode, context);
+      const sizing = registerSizingUtilities(frame, parentLayoutMode, context, parentFrame);
       classes.push(...sizing.classes);
 
-      const fill = getFillStyle(frame);
       const inlineStyles = [...sizing.styles];
       let hasPositioningTransform = false;
       if (positionContainer) {
@@ -77,22 +77,17 @@ export const convertFrame = async ({
       const isRoot = context.rootNode !== null && frame.id === context.rootNode.id;
       let imageSrc: string | null = null;
       if (!isMaskNode(frame)) {
-        if (fill) inlineStyles.push(`background: ${fill}`);
-        else if (hasImageFill(frame)) {
-          imageSrc = await registerImageAsset(frame, context);
-          if (imageSrc) {
-            if (frame.children.length > 0) {
-              inlineStyles.push(
-                `background-image: url("${imageSrc}")`,
-                'background-size: cover',
-                'background-position: center',
-                'background-repeat: no-repeat'
-              );
-              imageSrc = null; // used as background, not <img>
-            }
-          } else {
-            inlineStyles.push('background: #e5e7eb');
-          }
+        const stacked = await appendStackedFillStyles(frame, inlineStyles, context, {
+          asImgIfSoleImage: frame.children.length === 0,
+          nameHint: frame.name,
+        });
+        imageSrc = stacked.imageSrcForImgTag;
+        if (
+          !imageSrc &&
+          !inlineStyles.some((s) => s.startsWith('background')) &&
+          hasImageFill(frame)
+        ) {
+          inlineStyles.push('background: #e5e7eb');
         }
       }
       if (isRoot) {
@@ -119,8 +114,8 @@ export const convertFrame = async ({
       inlineStyles.push(...getClipsContentStyles(frame));
       // Figma frame dimensions include padding; use border-box so width/height match
       if (frame.layoutMode !== 'NONE') inlineStyles.push('box-sizing: border-box');
-      if (isMeaningfulRotation(frame.rotation) && !hasPositioningTransform) {
-        inlineStyles.push('transform-origin: 0 0', `transform: rotate(${cssRotationDeg(frame.rotation)}deg)`);
+      if (!hasPositioningTransform) {
+        appendNodeTransformStyles(inlineStyles, frame);
       }
       const { inline: keepInline, classLines: visualClassLines } = splitInlineVsClassStyles(inlineStyles);
       inlineStyles.length = 0;
@@ -206,7 +201,6 @@ export const convertFrame = async ({
           while (j < groupChildren.length) {
             const gc = groupChildren[j] as SceneNode;
             if (isMaskNode(gc)) {
-              const clipPath = getClipPathFromMaskNode(gc);
               let k = j + 1;
               while (k < groupChildren.length && !isMaskNode(groupChildren[k] as SceneNode)) k++;
               const maskedCount = k - j - 1;
@@ -218,8 +212,7 @@ export const convertFrame = async ({
                   'position: absolute',
                   'overflow: hidden',
                 ];
-                if (clipPath) wrapperStyles.push(`clip-path: ${clipPath}`);
-                wrapperStyles.push(...getMaskImageStyles(gc));
+                await appendMaskWrapperStyles(gc, wrapperStyles, context);
                 wrapperStyles.push(...getPositionStylesRelativeToContainer(gc, frame, j + 1));
                 const innerIndent = '  '.repeat(baseIndent + indent + 1);
                 html += '\n' + innerIndent + `<div ${getClassAttr([])}${getStyleAttr(wrapperStyles)}>`;
@@ -236,7 +229,6 @@ export const convertFrame = async ({
           }
           i++;
         } else if (isMaskNode(child)) {
-          const clipPath = getClipPathFromMaskNode(child);
           let k = i + 1;
           while (k < frameChildren.length && !isMaskNode(frameChildren[k])) k++;
           const maskedCount = k - i - 1;
@@ -248,8 +240,7 @@ export const convertFrame = async ({
               'position: absolute',
               'overflow: hidden',
             ];
-            if (clipPath) wrapperStyles.push(`clip-path: ${clipPath}`);
-            wrapperStyles.push(...getMaskImageStyles(child));
+            await appendMaskWrapperStyles(child, wrapperStyles, context);
             const idx = i + 1;
             const z = frame.itemReverseZIndex ? frameChildren.length - 1 - idx : idx + 1;
             wrapperStyles.push(...getPositionStylesRelativeToContainer(child, frame, z));

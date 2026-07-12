@@ -36,7 +36,8 @@ export const mapCounterAxis = (val: FrameNode['counterAxisAlignItems']) => {
 export const registerSizingUtilities = (
   node: SceneNode,
   parentLayoutMode: FrameNode['layoutMode'] | null,
-  context: ExportContext
+  context: ExportContext,
+  parentFrame: FrameNode | null = null
 ): { classes: string[]; styles: string[] } => {
   const classes: string[] = [];
   const styles: string[] = [];
@@ -61,14 +62,67 @@ export const registerSizingUtilities = (
     if (classes.indexOf(cls) === -1) classes.push(cls);
   };
 
+  const hasMaxWidth =
+    'maxWidth' in node &&
+    typeof (node as { maxWidth?: number | null }).maxWidth === 'number' &&
+    (node as { maxWidth: number }).maxWidth > 0;
+  const hasMaxHeight =
+    'maxHeight' in node &&
+    typeof (node as { maxHeight?: number | null }).maxHeight === 'number' &&
+    (node as { maxHeight: number }).maxHeight > 0;
+
+  /**
+   * Parent CENTER/MAX on counter axis: `align-self: stretch` + `max-width` leaves the
+   * capped box stuck at the start. Prefer `width/height: 100%` so parent `items-center|end`
+   * can center the constrained child (matches Figma FILL + max size).
+   */
+  const parentCentersOrEndsCounter = (() => {
+    if (!parentFrame || parentFrame.layoutMode === 'NONE' || parentFrame.layoutMode === 'GRID') {
+      return false;
+    }
+    const align = parentFrame.counterAxisAlignItems;
+    return align === 'CENTER' || align === 'MAX';
+  })();
+
+  let horizontalCounterFillDone = false;
+  let verticalCounterFillDone = false;
+
+  const applyHorizontalCounterFill = () => {
+    if (horizontalCounterFillDone || isAbsolute) return;
+    horizontalCounterFillDone = true;
+    if (parentCentersOrEndsCounter && hasMaxWidth) {
+      registerUtilityClass('w-full', ['  width: 100%;'], context);
+      addClass('w-full');
+      return;
+    }
+    registerUtilityClass('self-stretch', ['  align-self: stretch;'], context);
+    addClass('self-stretch');
+  };
+
+  const applyVerticalCounterFill = () => {
+    if (verticalCounterFillDone || isAbsolute) return;
+    verticalCounterFillDone = true;
+    if (parentCentersOrEndsCounter && hasMaxHeight) {
+      registerUtilityClass('h-full', ['  height: 100%;'], context);
+      addClass('h-full');
+      return;
+    }
+    registerUtilityClass('self-stretch', ['  align-self: stretch;'], context);
+    addClass('self-stretch');
+  };
+
   if (parentLayoutMode && layoutGrow > 0 && !isAbsolute) {
     registerUtilityClass('flex-1', ['  flex: 1;'], context);
     addClass('flex-1');
   }
 
   if (parentLayoutMode && layoutAlign === 'STRETCH' && !isAbsolute) {
-    registerUtilityClass('self-stretch', ['  align-self: stretch;'], context);
-    addClass('self-stretch');
+    if (parentLayoutMode === 'VERTICAL') applyHorizontalCounterFill();
+    else if (parentLayoutMode === 'HORIZONTAL') applyVerticalCounterFill();
+    else {
+      registerUtilityClass('self-stretch', ['  align-self: stretch;'], context);
+      addClass('self-stretch');
+    }
   }
 
   if (hasLayoutSizing && parentLayoutMode && !isAbsolute) {
@@ -77,8 +131,7 @@ export const registerSizingUtilities = (
         registerUtilityClass('flex-1', ['  flex: 1;'], context);
         addClass('flex-1');
       } else if (parentLayoutMode === 'VERTICAL') {
-        registerUtilityClass('self-stretch', ['  align-self: stretch;'], context);
-        addClass('self-stretch');
+        applyHorizontalCounterFill();
       }
     }
     if (sizingVertical === 'FILL') {
@@ -86,8 +139,7 @@ export const registerSizingUtilities = (
         registerUtilityClass('flex-1', ['  flex: 1;'], context);
         addClass('flex-1');
       } else if (parentLayoutMode === 'HORIZONTAL') {
-        registerUtilityClass('self-stretch', ['  align-self: stretch;'], context);
-        addClass('self-stretch');
+        applyVerticalCounterFill();
       }
     }
   }
@@ -102,7 +154,7 @@ export const registerSizingUtilities = (
         styles.push(`height: ${roundDim(text.height)}px`);
       }
     } else {
-      if (text.textAutoResize === 'NONE') {
+      if (text.textAutoResize === 'NONE' || text.textAutoResize === 'TRUNCATE') {
         styles.push(`width: ${roundDim(text.width)}px`);
         styles.push(`height: ${roundDim(text.height)}px`);
       } else if (text.textAutoResize === 'HEIGHT') {
@@ -151,9 +203,7 @@ export const registerSizingUtilities = (
       if (frame.layoutMode === 'NONE') {
         styles.push(`width: ${roundDim(frame.width)}px`);
         styles.push(`height: ${roundDim(frame.height)}px`);
-        return { classes, styles };
-      }
-
+      } else {
       const primaryIsWidth = frame.layoutMode === 'HORIZONTAL';
       const primaryFixed = frame.primaryAxisSizingMode === 'FIXED';
       const counterFixed = frame.counterAxisSizingMode === 'FIXED';
@@ -175,7 +225,42 @@ export const registerSizingUtilities = (
           )}px`
         );
       }
+      }
     }
+  }
+
+  // Figma min/max size constraints
+  if ('minWidth' in node && typeof (node as { minWidth?: number | null }).minWidth === 'number') {
+    const v = (node as { minWidth: number }).minWidth;
+    if (v > 0) styles.push(`min-width: ${roundDim(v)}px`);
+  }
+  if ('maxWidth' in node && typeof (node as { maxWidth?: number | null }).maxWidth === 'number') {
+    const v = (node as { maxWidth: number }).maxWidth;
+    if (v > 0) styles.push(`max-width: ${roundDim(v)}px`);
+  }
+  if ('minHeight' in node && typeof (node as { minHeight?: number | null }).minHeight === 'number') {
+    const v = (node as { minHeight: number }).minHeight;
+    if (v > 0) styles.push(`min-height: ${roundDim(v)}px`);
+  }
+  if ('maxHeight' in node && typeof (node as { maxHeight?: number | null }).maxHeight === 'number') {
+    const v = (node as { maxHeight: number }).maxHeight;
+    if (v > 0) styles.push(`max-height: ${roundDim(v)}px`);
+  }
+
+  // CSS grid child placement
+  if (
+    parentLayoutMode === 'GRID' &&
+    'gridColumnSpan' in node &&
+    typeof (node as { gridColumnSpan?: number }).gridColumnSpan === 'number'
+  ) {
+    const col = (node as { gridColumnAnchorIndex?: number; gridColumnSpan: number });
+    const row = (node as { gridRowAnchorIndex?: number; gridRowSpan?: number });
+    const colStart = (col.gridColumnAnchorIndex ?? 0) + 1;
+    const colSpan = Math.max(1, col.gridColumnSpan);
+    const rowStart = (row.gridRowAnchorIndex ?? 0) + 1;
+    const rowSpan = Math.max(1, row.gridRowSpan ?? 1);
+    styles.push(`grid-column: ${colStart} / span ${colSpan}`);
+    styles.push(`grid-row: ${rowStart} / span ${rowSpan}`);
   }
 
   return { classes, styles };
