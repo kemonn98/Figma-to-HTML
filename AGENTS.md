@@ -8,7 +8,7 @@ Figma plugin that exports a selected **auto-layout or grid frame** to **HTML + C
 
 - Plugin name in Figma: **Figma to Codes**
 - Source entry: `src/main.ts` (bundled to `code.js` via esbuild)
-- UI: `ui.html` (370×600)
+- UI: `ui.html` (370×730)
 
 ## Repository map
 
@@ -22,14 +22,14 @@ Figma plugin that exports a selected **auto-layout or grid frame** to **HTML + C
 | `src/assets/` | Image/SVG asset registration |
 | `src/utils/` | Names, color/rem, HTML helpers, transform (flip/rotate), exportAsync slot |
 | `code.js` | Bundled output Figma loads (gitignored) — do not edit by hand |
-| `ui.html` | Plugin UI (checklist + Readme modals, pro tips during export, HTML/CSS/Assets tabs, preview, ZIP, progress) |
+| `ui.html` | Plugin UI (checklist + progress + Readme modals, pro tips during export, HTML/CSS/Assets tabs, preview, ZIP) |
 | `manifest.json` | Figma plugin manifest (`main: code.js`) |
 | `tsconfig.json` | Typecheck only (`noEmit`); includes `@figma/plugin-typings` |
 | `previews/html/` | Local HTML/CSS preview samples |
 | `README.md` | Feature and mapping documentation |
 | `AGENTS.md` | Agent conventions and commands |
 | `VERSION.md` | Changelog and current version |
-| `FEATURE-CHECKLIST.md` | Figma feature coverage (Done / Partial / Planned / Out of scope) |
+| `FEATURES.md` | Figma feature coverage (Done / Partial / Planned / Out of scope) |
 | `.cursor/rules/` | Always-on Cursor rules (project context, git push release) |
 
 ## Commands
@@ -97,4 +97,4 @@ Order: inspect diffs → bump `VERSION.md` + `package.json` → update `README.m
 
 - [Figma Plugin API](https://www.figma.com/plugin-docs/)
 - Local docs: `README.md` (node type table, layout mapping, styling approach)
-- Coverage checklist: `FEATURE-CHECKLIST.md` (what we map vs out of scope for static HTML/CSS)
+- Coverage checklist: `FEATURES.md` (what we map vs out of scope for static HTML/CSS)

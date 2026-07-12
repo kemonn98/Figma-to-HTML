@@ -9,7 +9,7 @@ A Figma plugin that exports a selected **frame with auto-layout** to **HTML + CS
 - **Input:** One frame selected in Figma that uses **auto-layout** (layout mode is not "None"). Grid layout is also supported.
 - **Output:** A full HTML document and a separate CSS file (`index.html`, `styles.css`).
 
-The plugin walks the frame tree, maps Figma’s layout and styles to HTML elements and CSS (utility-style classes + inline styles where needed), and returns the markup and CSS. The plugin UI is 370×600px.
+The plugin walks the frame tree, maps Figma’s layout and styles to HTML elements and CSS (utility-style classes + inline styles where needed), and returns the markup and CSS. The plugin UI is 370×730px.
 
 ---
 
@@ -31,15 +31,15 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 ## UI (ui.html)
 
 - **Header:** Title "Figma to Codes", version capsule, and short instructions.
-- **Export:** Opens a checklist modal (auto layout, assets, naming, clip tips) unless dismissed via “Don’t show this again” (`figma.clientStorage`); info icon reopens guidelines. After **Continue export**, shows a full-width status card (primary step + % in white, detail/filename in gray, 0–100% bar) plus rotating **Pro tips** below the status card.
+- **Export:** Opens a checklist modal (auto layout, assets, naming, clip tips) unless dismissed via “Don’t show this again” (`figma.clientStorage`); info icon reopens guidelines. After **Continue export**, a **progress modal** (dark blurred backdrop) shows the current step + % bar and rotating **Pro tips**.
 - **Download ZIP:** Builds a ZIP with HTML, CSS, and exported files under `assets/` (PNG images and SVG vectors; export first if needed). Filename: `figma-export.zip`. Large exports (total assets ≳20 MB) may skip the live preview to save memory; use **Load preview** when offered — ZIP download still works.
 - **Output panels:** Tabs for **HTML**, **CSS**, and **Assets** are visible on open (placeholders until export); then show code / asset list.
-- **Toasts:** Success/error only (e.g. "Export complete.", "Copied to clipboard.", "ZIP downloaded."); progress stays in the status card.
+- **Toasts:** Success/error only (e.g. "Export complete.", "Copied to clipboard.", "ZIP downloaded."); progress stays in the progress modal.
 - **Footer:** “Plugin by SlabPixel” (link) · **Readme** opens “Why this exists” (vibe-coding context for layout, not a 100% Figma→production generator).
 
 The plugin UI is 370×600px.
 
-Coverage of what maps to static HTML/CSS vs out of scope: [`FEATURE-CHECKLIST.md`](FEATURE-CHECKLIST.md).
+Coverage of what maps to static HTML/CSS vs out of scope: [`FEATURES.md`](FEATURES.md).
 
 ---
 

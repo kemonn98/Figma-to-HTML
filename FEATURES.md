@@ -1,4 +1,4 @@
-# FEATURE-CHECKLIST.md
+# FEATURES.md
 
 Figma → static HTML/CSS fidelity checklist for **Figma to Codes**.
 

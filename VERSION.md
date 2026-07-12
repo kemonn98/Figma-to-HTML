@@ -2,7 +2,7 @@
 
 Changelog and version history for **Figma to HTML** (Figma plugin: *Figma to Codes*).
 
-**Current version: `1.5.7`**
+**Current version: `1.5.8`**
 
 Source of truth for released history: commits on `main` → [kemonn98/Figma-to-HTML](https://github.com/kemonn98/Figma-to-HTML).  
 `package.json` should stay in sync with the version declared here.
@@ -20,6 +20,15 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 ---
 
 ## Unreleased
+
+---
+
+## 1.5.8 — 2026-07-12
+
+**Commit:** `pending`
+
+- UI: export progress + Pro tips in a popup modal with dark blurred backdrop
+- Plugin window height 730px; rename coverage doc to `FEATURES.md`
 
 ---
 
@@ -43,7 +52,7 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 - Flip H/V from `relativeTransform` → `scaleX/Y(-1)`; rotate/flip pivot always center + AABB positioning
 - Fix: FILL + max-width under parent `items-center|end` → `w-full` (not `self-stretch`)
 - Text truncate / individual side strokes
-- UI: rotating Pro tips during export; footer Readme (“Why this exists”); FEATURE-CHECKLIST.md
+- UI: rotating Pro tips during export; footer Readme (“Why this exists”); FEATURES.md
 - Corner smoothing documented as out of scope (geometric radius only)
 
 ---

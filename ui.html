@@ -189,7 +189,7 @@
   }
   .preview-canvas {
     position: relative;
-    min-height: 100px;
+    min-height: 197px;
     background: #0f0f0f;
     display: flex;
     justify-content: center;
@@ -303,17 +303,14 @@
   .btn-export-dot:nth-child(3) { animation-delay: 0.2s; }
 
   .export-status {
-    display: none;
     width: 100%;
     box-sizing: border-box;
-    margin: 12px 0 0;
-    padding: 12px 14px;
+    margin: 0;
+    padding: 0;
     text-align: left;
-    background: #141414;
-    border: 1px solid #262626;
-    border-radius: 10px;
+    background: transparent;
+    border: none;
   }
-  .export-status.visible { display: block; }
   .export-status-header {
     display: flex;
     align-items: flex-start;
@@ -348,7 +345,7 @@
     border-radius: 999px;
     background: #262626;
     overflow: hidden;
-    margin-top: 10px;
+    margin-top: 12px;
   }
   .export-status-bar {
     height: 100%;
@@ -357,17 +354,34 @@
     background: #0835ff;
     transition: width 0.2s ease;
   }
-  .export-protip {
-    display: none;
-    width: 100%;
-    max-width: 320px;
-    margin: 10px auto 0;
-    text-align: center;
+  .export-progress-overlay {
+    z-index: 1100;
+    background: rgba(0, 0, 0, 0.55);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
   }
-  .export-protip.visible {
+  .export-progress-card {
+    max-width: 300px;
+    gap: 0;
+  }
+  .export-progress-card .modal-header {
+    padding: 16px 16px 0;
+  }
+  .export-progress-card .modal-body {
+    padding: 12px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .export-protip {
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
+    margin: 0;
+    padding-top: 12px;
+    border-top: 1px solid #262626;
+    text-align: center;
   }
   .export-protip-label {
     display: block;
@@ -388,18 +402,16 @@
   .export-protip-body.is-fading {
     opacity: 0;
   }
-  .hero .export-protip-title,
   .export-protip-title {
-    margin: 8px;
+    margin: 8px 0 0;
     padding: 0;
     font-size: 12px;
     font-weight: 400;
     line-height: 1.3;
     color: #ffffff;
   }
-  .hero .export-protip-desc,
   .export-protip-desc {
-    margin: 0;
+    margin: 6px 0 0;
     padding: 0;
     font-size: 11px;
     line-height: 1.35;
@@ -532,7 +544,7 @@
     margin: 0;
     padding: 10px 12px;
     min-height: 190px;
-    max-height: 280px;
+    max-height: 190px;
     overflow: auto;
     list-style: none;
   }
@@ -853,7 +865,7 @@
     <div class="hero-inner">
       <div class="hero-title">
         <h1>Figma to Codes</h1>
-        <span class="version-capsule" title="Plugin version">v1.5.7</span>
+        <span class="version-capsule" title="Plugin version">v1.5.8</span>
       </div>
       <p>Select an auto-layout frame, then export.</p>
       <div class="export-actions">
@@ -868,22 +880,6 @@
         <button type="button" id="export-guide-info" class="btn-export-info" title="Export guidelines" aria-label="Open export guidelines">
           <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
         </button>
-      </div>
-      <div id="export-status" class="export-status" aria-live="polite" aria-atomic="true">
-        <div class="export-status-header">
-          <p class="export-status-text" id="export-status-text">Exporting…</p>
-          <p class="export-status-meta" id="export-status-meta">0%</p>
-        </div>
-        <div class="export-status-track" aria-hidden="true">
-          <div class="export-status-bar" id="export-status-bar"></div>
-        </div>
-      </div>
-      <div class="export-protip" id="export-protip" aria-live="polite">
-        <span class="export-protip-label">Pro tip</span>
-        <div class="export-protip-body" id="export-protip-body">
-          <p class="export-protip-title" id="export-protip-title"></p>
-          <p class="export-protip-desc" id="export-protip-desc"></p>
-        </div>
       </div>
       <div id="preview-canvas-wrap" class="preview-canvas-wrap" aria-live="polite">
         <div class="preview-canvas-header">
@@ -961,6 +957,33 @@
         <span class="plugin-credit-sep" aria-hidden="true">·</span>
         <button type="button" class="plugin-credit-link" id="open-readme" aria-haspopup="dialog">Readme</button>
       </p>
+    </div>
+  </div>
+</div>
+
+<div id="export-progress-modal" class="modal-overlay export-progress-overlay" role="dialog" aria-modal="true" aria-labelledby="export-progress-title" hidden>
+  <div class="modal export-progress-card">
+    <div class="modal-header">
+      <h2 class="modal-title" id="export-progress-title">Exporting…</h2>
+      <p class="modal-subtitle">Sit tight — converting your frame to HTML &amp; CSS.</p>
+    </div>
+    <div class="modal-body">
+      <div id="export-status" class="export-status" aria-live="polite" aria-atomic="true">
+        <div class="export-status-header">
+          <p class="export-status-text" id="export-status-text">Exporting…</p>
+          <p class="export-status-meta" id="export-status-meta">0%</p>
+        </div>
+        <div class="export-status-track" aria-hidden="true">
+          <div class="export-status-bar" id="export-status-bar"></div>
+        </div>
+      </div>
+      <div class="export-protip" id="export-protip" aria-live="polite">
+        <span class="export-protip-label">Pro tip</span>
+        <div class="export-protip-body" id="export-protip-body">
+          <p class="export-protip-title" id="export-protip-title"></p>
+          <p class="export-protip-desc" id="export-protip-desc"></p>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1290,8 +1313,6 @@
 
   function startExportProtips() {
     stopExportProtips();
-    var wrap = document.getElementById('export-protip');
-    if (wrap) wrap.classList.add('visible');
     exportProtipIndex = Math.floor(Math.random() * EXPORT_PROTIPS.length);
     renderExportProtip(exportProtipIndex, false);
     exportProtipTimer = setInterval(function() {
@@ -1305,18 +1326,30 @@
       clearInterval(exportProtipTimer);
       exportProtipTimer = null;
     }
-    var wrap = document.getElementById('export-protip');
-    if (wrap) wrap.classList.remove('visible');
+  }
+
+  function showExportProgressModal() {
+    var overlay = document.getElementById('export-progress-modal');
+    if (!overlay) return;
+    overlay.hidden = false;
+    overlay.classList.add('visible');
+  }
+
+  function hideExportProgressModal() {
+    var overlay = document.getElementById('export-progress-modal');
+    if (!overlay) return;
+    overlay.classList.remove('visible');
+    overlay.hidden = true;
   }
 
   function setExportStatus(message, percent) {
-    var wrap = document.getElementById('export-status');
     var text = document.getElementById('export-status-text');
     var bar = document.getElementById('export-status-bar');
     var meta = document.getElementById('export-status-meta');
-    if (!wrap || !text || !bar || !meta) return;
-    var wasVisible = wrap.classList.contains('visible');
-    wrap.classList.add('visible');
+    if (!text || !bar || !meta) return;
+    var overlay = document.getElementById('export-progress-modal');
+    var wasVisible = overlay && overlay.classList.contains('visible');
+    showExportProgressModal();
     if (!wasVisible) startExportProtips();
     text.innerHTML = formatExportStatusHtml(message);
     var pct = typeof percent === 'number' && !isNaN(percent)
@@ -1328,10 +1361,9 @@
 
   function clearExportStatus() {
     stopExportProtips();
-    var wrap = document.getElementById('export-status');
+    hideExportProgressModal();
     var bar = document.getElementById('export-status-bar');
     var meta = document.getElementById('export-status-meta');
-    if (wrap) wrap.classList.remove('visible');
     if (bar) bar.style.width = '0%';
     if (meta) meta.textContent = '';
   }
