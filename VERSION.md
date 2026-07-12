@@ -25,7 +25,7 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 
 ## 1.5.6 — 2026-07-12
 
-**Commit:** `pending`
+**Commit:** `f5bfad4`
 
 - Fidelity: background blur, min/max size, multi-fill stacks, image FILL/FIT/TILE/CROP, per-corner radius, grid child span, `strokesIncludedInLayout`, mixed text spans, vertical text align, paragraph indent, lists, OpenType features, ellipse as CSS, vector masks as SVG `mask-image`, full blur radius, radial gradient centers, CSS variables from bound fills
 - Flip H/V from `relativeTransform` → `scaleX/Y(-1)`; rotate/flip pivot always center + AABB positioning
