@@ -209,6 +209,57 @@
   .preview-canvas-wrap.has-content .preview-placeholder {
     display: none;
   }
+  .preview-deferred {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 120px;
+    padding: 24px 16px;
+    text-align: center;
+    box-sizing: border-box;
+  }
+  .preview-canvas-wrap.is-deferred .preview-deferred {
+    display: flex;
+  }
+  .preview-canvas-wrap.is-deferred .preview-placeholder {
+    display: none;
+  }
+  .preview-canvas-wrap.is-deferred .preview-iframe-container {
+    display: none;
+  }
+  .preview-canvas-wrap.is-deferred .preview-zoom {
+    display: none;
+  }
+  .preview-deferred-text {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #737373;
+    max-width: 260px;
+  }
+  .preview-load-btn {
+    appearance: none;
+    border: 1px solid #404040;
+    border-radius: 8px;
+    background: #262626;
+    color: #f5f5f5;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .preview-load-btn:hover {
+    background: #333;
+    border-color: #525252;
+  }
+  .preview-load-btn:focus-visible {
+    outline: 2px solid #525252;
+    outline-offset: 2px;
+  }
   /* Preview: 75% width, content scaled down inside iframe */
   .preview-iframe-container {
     display: none;
@@ -802,7 +853,7 @@
     <div class="hero-inner">
       <div class="hero-title">
         <h1>Figma to Codes</h1>
-        <span class="version-capsule" title="Plugin version">v1.5.6</span>
+        <span class="version-capsule" title="Plugin version">v1.5.7</span>
       </div>
       <p>Select an auto-layout frame, then export.</p>
       <div class="export-actions">
@@ -845,6 +896,10 @@
         </div>
         <div class="preview-canvas">
           <p class="preview-placeholder" id="preview-placeholder">Export to see preview.</p>
+          <div class="preview-deferred" id="preview-deferred" hidden>
+            <p class="preview-deferred-text">Preview skipped for large export to save memory. ZIP download still works.</p>
+            <button type="button" class="preview-load-btn" id="preview-load-btn">Load preview</button>
+          </div>
           <div class="preview-iframe-container">
             <iframe id="preview-iframe" class="preview-iframe" title="Exported design preview" sandbox="allow-same-origin allow-scripts"></iframe>
           </div>
@@ -1105,7 +1160,7 @@
   var EXPORT_PROTIPS = [
     {
       q: 'Why is image export slow?',
-      a: 'Each unique IMAGE fill is read and encoded into the ZIP. More assets = longer wait.'
+      a: 'Each unique IMAGE fill is re-encoded as size-capped PNG (keeps transparency) then sent to the ZIP. More assets = longer wait. Very large exports may skip live preview; ZIP still works.'
     },
     {
       q: 'Why does layout look messy?',
@@ -1142,6 +1197,70 @@
     {
       q: 'Static HTML & CSS only.',
       a: 'Prototype interactions, animations, and sticky scroll behavior are out of scope for this export.'
+    },
+    {
+      q: 'Preview skipped?',
+      a: 'If total assets exceed ~20 MB, live preview is deferred to save memory. Download ZIP still works—or tap Load preview.'
+    },
+    {
+      q: 'Images stay sharp enough.',
+      a: 'Bitmap fills are capped around 2× the layer size (max 1920px long edge) so exports stay lighter without blowing up Figma.'
+    },
+    {
+      q: 'Transparency is kept.',
+      a: 'Compressed images export as PNG so alpha stays intact—no white box behind logos or cutouts.'
+    },
+    {
+      q: 'Button & link names.',
+      a: 'Name layers Button, Btn, or CTA for <button>; Link for <a href="#">. Clear names beat generic Frame 123.'
+    },
+    {
+      q: 'Duplicate images = one file.',
+      a: 'The same IMAGE fill reused across layers is exported once and shared—reuse assets in Figma when you can.'
+    },
+    {
+      q: 'Text truncation.',
+      a: 'Figma truncate / max-lines maps to CSS ellipsis or line-clamp. Fixed-height text boxes without truncate may still overflow in HTML.'
+    },
+    {
+      q: 'Mixed text styles.',
+      a: 'Bold, color, or size changes inside one text layer become nested spans—cleaner than splitting into many text nodes.'
+    },
+    {
+      q: 'Flip & rotate.',
+      a: 'Horizontal/vertical flips and rotation are read from the layer transform and applied with CSS scale/rotate.'
+    },
+    {
+      q: 'Variables → CSS vars.',
+      a: 'Bound color variables can become custom properties (--token) in the stylesheet when Figma exposes them.'
+    },
+    {
+      q: 'Google Fonts linked.',
+      a: 'Font families used in the frame are linked from Google Fonts in the HTML head when possible.'
+    },
+    {
+      q: 'Groups vs frames.',
+      a: 'Prefer auto-layout frames for structure. Loose groups often become absolute positioning and messier CSS.'
+    },
+    {
+      q: 'Hidden layers skip.',
+      a: 'Layers with visibility off (or near-zero opacity) are skipped—hide drafts in Figma instead of deleting them.'
+    },
+    {
+      q: 'Download ZIP anytime.',
+      a: 'After export finishes, Download ZIP packs index.html, styles.css, and assets/—even if preview was deferred.'
+    },
+    {
+      q: 'Export big sites in chunks.',
+      a: 'Huge marketing pages export more reliably frame-by-frame (hero, sections) than one enormous root.'
+    },
+    {
+      q: 'Simple dividers.',
+      a: 'Straight horizontal/vertical lines often become CSS borders—no extra SVG file for basic rules.'
+    },
+    {
+      q: 'Masks need vector/shape.',
+      a: 'Alpha/vector masks export best from shape or vector mask layers; complex group masks may be approximate.'
     }
   ];
   var exportProtipTimer = null;
@@ -1247,6 +1366,66 @@
   }
 
   var lastExportAssets = [];
+  var exportTransferComplete = false;
+  var lastPreviewMode = 'full';
+  var lastFrameWidth = 0;
+  var lastFrameHeight = 0;
+
+  function showDeferredPreview() {
+    var wrap = document.getElementById('preview-canvas-wrap');
+    var deferred = document.getElementById('preview-deferred');
+    var placeholder = document.getElementById('preview-placeholder');
+    if (!wrap || !deferred) return;
+    wrap.classList.remove('has-content');
+    wrap.classList.add('is-deferred');
+    deferred.hidden = false;
+    if (placeholder) placeholder.style.display = 'none';
+  }
+
+  function hideDeferredPreview() {
+    var wrap = document.getElementById('preview-canvas-wrap');
+    var deferred = document.getElementById('preview-deferred');
+    var placeholder = document.getElementById('preview-placeholder');
+    if (wrap) wrap.classList.remove('is-deferred');
+    if (deferred) deferred.hidden = true;
+    if (placeholder) placeholder.style.display = '';
+  }
+
+  function loadExportPreview() {
+    var outputEl = document.getElementById('output');
+    var cssEl = document.getElementById('css');
+    if (!outputEl || !cssEl) return;
+    hideDeferredPreview();
+    var assetMap = buildAssetDataUrlMap(lastExportAssets);
+    var previewDocs = rewriteAssetUrls(outputEl.value, cssEl.value, assetMap);
+    updatePreviewCanvas(
+      previewDocs.html,
+      previewDocs.css,
+      lastFrameWidth,
+      lastFrameHeight
+    );
+  }
+
+  function finishExportUi() {
+    setExportLoading(false);
+    exportTransferComplete = true;
+    renderAssetsList(lastExportAssets);
+    setPreviewExpanded(true);
+    if (lastPreviewMode === 'deferred') {
+      showDeferredPreview();
+      showToast('Export complete. Preview deferred for large export.', 'success');
+    } else {
+      hideDeferredPreview();
+      loadExportPreview();
+      showToast('Export complete.', 'success');
+    }
+    var outputEl = document.getElementById('output');
+    var cssEl = document.getElementById('css');
+    setTimeout(function() {
+      if (outputEl) renderHighlightedCode('output-display', outputEl.value, 'markup');
+      if (cssEl) renderHighlightedCode('css-display', cssEl.value, 'css');
+    }, 0);
+  }
 
   function base64ToUint8Array(b64) {
     var binary = atob(b64);
@@ -1309,6 +1488,7 @@
     var wrap = document.getElementById('preview-canvas-wrap');
     var iframe = document.getElementById('preview-iframe');
     if (!wrap || !iframe) return;
+    wrap.classList.remove('is-deferred');
     wrap.classList.remove('has-content');
     if (!html && !css) return;
     wrap.classList.add('has-content');
@@ -1494,6 +1674,8 @@
 
   function startExport() {
     closeExportChecklistModal();
+    exportTransferComplete = false;
+    lastExportAssets = [];
     setExportLoading(true);
     setExportStatus('Starting export…', 0);
     parent.postMessage({ pluginMessage: { type: 'export' } }, '*');
@@ -1550,6 +1732,10 @@
       showToast('Export first to download.', 'error');
       return;
     }
+    if (!exportTransferComplete) {
+      showToast('Export still finishing…', 'info');
+      return;
+    }
     showToast('Preparing ZIP…', 'info');
     var zip = new JSZip();
     zip.file('index.html', output);
@@ -1585,6 +1771,18 @@
     applyPreviewZoom();
   };
 
+  var previewLoadBtn = document.getElementById('preview-load-btn');
+  if (previewLoadBtn) {
+    previewLoadBtn.onclick = function() {
+      if (!exportTransferComplete) {
+        showToast('Export still finishing…', 'info');
+        return;
+      }
+      showToast('Loading preview…', 'info');
+      loadExportPreview();
+    };
+  }
+
   onmessage = function(event) {
     var msg = event.data && event.data.pluginMessage;
     if (!msg || !msg.type) return;
@@ -1596,31 +1794,36 @@
       setExportStatus(msg.message || 'Exporting…', msg.percent);
       return;
     }
-    if (msg.type === 'export-result') {
-      setExportLoading(false);
+    if (msg.type === 'export-meta') {
+      exportTransferComplete = false;
+      lastExportAssets = [];
+      lastPreviewMode = msg.previewMode === 'deferred' ? 'deferred' : 'full';
+      lastFrameWidth = msg.frameWidth || 0;
+      lastFrameHeight = msg.frameHeight || 0;
       var outputEl = document.getElementById('output');
       var cssEl = document.getElementById('css');
-      outputEl.value = msg.html || '';
-      cssEl.value = msg.css || '';
-      lastExportAssets = msg.assets || [];
+      if (outputEl) outputEl.value = msg.html || '';
+      if (cssEl) cssEl.value = msg.css || '';
+      hideDeferredPreview();
       renderAssetsList(lastExportAssets);
-      setPreviewExpanded(true);
-      var assetMap = buildAssetDataUrlMap(lastExportAssets);
-      var previewDocs = rewriteAssetUrls(outputEl.value, cssEl.value, assetMap);
-      updatePreviewCanvas(
-        previewDocs.html,
-        previewDocs.css,
-        msg.frameWidth,
-        msg.frameHeight
-      );
-      showToast('Export complete.', 'success');
-      setTimeout(function() {
-        renderHighlightedCode('output-display', outputEl.value, 'markup');
-        renderHighlightedCode('css-display', cssEl.value, 'css');
-      }, 0);
+      return;
+    }
+    if (msg.type === 'export-asset') {
+      lastExportAssets.push({
+        fileName: msg.fileName,
+        bytesBase64: msg.bytesBase64,
+        mimeType: msg.mimeType || 'image/png'
+      });
+      renderAssetsList(lastExportAssets);
+      return;
+    }
+    if (msg.type === 'export-done') {
+      finishExportUi();
+      return;
     }
     if (msg.type === 'error') {
       setExportLoading(false);
+      exportTransferComplete = false;
       showToast(msg.message || 'Something went wrong.', 'error');
     }
   };

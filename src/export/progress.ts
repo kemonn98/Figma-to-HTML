@@ -38,19 +38,27 @@ export const countExportableNodes = (node: SceneNode): number => {
   return count;
 };
 
-/** Count unique IMAGE fill hashes (each hash is exported once). */
-export const countUniqueImageHashes = (node: SceneNode, seen: Set<string>): void => {
+/** Count unique IMAGE fill hashes (each hash is exported once) and max needed edge. */
+export const collectImageHashPlans = (
+  node: SceneNode,
+  seen: Set<string>,
+  maxEdgeByHash: Map<string, number>
+): void => {
   if (node.visible === false) return;
   if ('fills' in node && node.fills !== figma.mixed && Array.isArray(node.fills)) {
+    const edge = Math.max(1, Math.round(Math.max(node.width, node.height) * 2));
     for (const paint of node.fills) {
       if (paint.type === 'IMAGE' && paint.visible !== false && paint.imageHash) {
-        seen.add(paint.imageHash);
+        const hash = paint.imageHash;
+        seen.add(hash);
+        const prev = maxEdgeByHash.get(hash) ?? 0;
+        if (edge > prev) maxEdgeByHash.set(hash, edge);
       }
     }
   }
   if ('children' in node && node.children) {
     for (const child of node.children) {
-      countUniqueImageHashes(child as SceneNode, seen);
+      collectImageHashPlans(child as SceneNode, seen, maxEdgeByHash);
     }
   }
 };

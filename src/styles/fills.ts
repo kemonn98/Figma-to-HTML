@@ -399,10 +399,12 @@ export const appendStackedFillStyles = async (
 
   if (soleImage) {
     const paint = visible[0] as ImagePaint;
+    const neededEdge = Math.max(1, Math.round(Math.max(node.width, node.height) * 2));
     const path = await registerImageByHash(
       paint.imageHash!,
       opts?.nameHint || node.name || 'img',
-      context
+      context,
+      neededEdge
     );
     return { imageSrcForImgTag: path };
   }
@@ -439,7 +441,8 @@ export const appendStackedFillStyles = async (
       const path = await registerImageByHash(
         ip.imageHash,
         opts?.nameHint || node.name || 'img',
-        context
+        context,
+        Math.max(1, Math.round(Math.max(node.width, node.height) * 2))
       );
       if (!path) {
         images.push('linear-gradient(#e5e7eb, #e5e7eb)');

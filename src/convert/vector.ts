@@ -23,6 +23,7 @@ import {
 import { hasImageFill } from '../assets/images';
 import { decodeSvgBytes, normalizeSvgToNodeSize, registerSvgAsset, buildSvgImgHtml } from '../assets/svg';
 import { truncateLabel, reportExportProgress, overallPercentFromLayers } from '../export/progress';
+import { withExportSlot } from '../utils/async';
 
 export const isVectorNode = (node: SceneNode) =>
   node.type === 'VECTOR' ||
@@ -245,7 +246,7 @@ export const convertVector = async ({
             `Exporting SVG… ${truncateLabel(node.name || node.type)}`,
             overallPercentFromLayers(context)
           );
-          const svgBytes = await node.exportAsync({ format: 'SVG' });
+          const svgBytes = await withExportSlot(() => node.exportAsync({ format: 'SVG' }));
           let svgText = decodeSvgBytes(svgBytes);
           if (!useAabbWrapper) {
             svgText = normalizeSvgToNodeSize(svgText, node.width, node.height);

@@ -2,6 +2,7 @@ import { toCssColor, roundDim, roundPx } from '../utils/color';
 import type { ExportContext, FigmaGradientPaint, FigmaMaskType } from '../types';
 import { gradientTransformToRadialCss, gradientTransformToConicCss, linearGradientToCss } from './fills';
 import { decodeSvgBytes, normalizeSvgToNodeSize, registerSvgAsset } from '../assets/svg';
+import { withExportSlot } from '../utils/async';
 
 /** Figma mask: a node with isMask=true masks all of its subsequent siblings. */
 export const isMaskNode = (node: SceneNode): boolean =>
@@ -151,7 +152,7 @@ export const appendMaskWrapperStyles = async (
 
   try {
     const exportable = maskNode as SceneNode & ExportMixin;
-    const svgBytes = await exportable.exportAsync({ format: 'SVG' });
+    const svgBytes = await withExportSlot(() => exportable.exportAsync({ format: 'SVG' }));
     let svgText = decodeSvgBytes(svgBytes);
     svgText = normalizeSvgToNodeSize(svgText, maskNode.width, maskNode.height);
     const svgPath = registerSvgAsset(`${maskNode.name || 'mask'}-mask`, svgText, context);

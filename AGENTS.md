@@ -14,13 +14,13 @@ Figma plugin that exports a selected **auto-layout or grid frame** to **HTML + C
 
 | Path | Role |
 |------|------|
-| `src/main.ts` | Thin entry: `showUI`, `onmessage` → `exportSelection` |
+| `src/main.ts` | Thin entry: `showUI`, `onmessage` → `exportSelection` + `sendExportResult` |
 | `src/types.ts` | Shared export types (`ExportContext`, `ExportResult`, …) |
-| `src/export/` | Selection export + progress reporting |
+| `src/export/` | Selection export, chunked send (`send.ts`), progress reporting |
 | `src/convert/` | Node → HTML dispatcher and per-type converters |
 | `src/styles/` | Fills, strokes, effects, mask, layout, position, CSS classes, variables |
 | `src/assets/` | Image/SVG asset registration |
-| `src/utils/` | Names, color/rem, HTML helpers, transform (flip/rotate) |
+| `src/utils/` | Names, color/rem, HTML helpers, transform (flip/rotate), exportAsync slot |
 | `code.js` | Bundled output Figma loads (gitignored) — do not edit by hand |
 | `ui.html` | Plugin UI (checklist + Readme modals, pro tips during export, HTML/CSS/Assets tabs, preview, ZIP, progress) |
 | `manifest.json` | Figma plugin manifest (`main: code.js`) |
@@ -47,9 +47,9 @@ After changing anything under `src/`, always rebuild (`npm run build` or keep `w
 
 ## Architecture notes
 
-- UI ↔ plugin messaging: UI posts `{ type: 'export' }`, `{ type: 'cancel' }`, `{ type: 'get-prefs' }`, or `{ type: 'set-pref' }`; plugin posts `prefs`, `export-progress`, `export-result`, or `error`. “Don’t show again” uses `figma.clientStorage` (not UI `localStorage`).
-- Export entry: `exportSelection()` → recursive `nodeToHtmlCss(...)` in `src/convert/node.ts`.
-- Result includes `assets` (base64) for ZIP/`assets/` files; preview rewrites asset paths to data URLs.
+- UI ↔ plugin messaging: UI posts `{ type: 'export' }`, `{ type: 'cancel' }`, `{ type: 'get-prefs' }`, or `{ type: 'set-pref' }`; plugin posts `prefs`, `export-progress`, then chunked `export-meta` → `export-asset` × N → `export-done`, or `error`. “Don’t show again” uses `figma.clientStorage` (not UI `localStorage`).
+- Export entry: `exportSelection()` → recursive `nodeToHtmlCss(...)` in `src/convert/node.ts`; then `sendExportResult()` streams assets. IMAGE fills are size-capped PNG via temp-rect `exportAsync` (preserves alpha). Preview defers when total asset bytes ≳20 MB.
+- Result assets arrive as chunked base64 for ZIP/`assets/` files; preview rewrites asset paths to data URLs when loaded.
 - Styling: utility classes (gap/padding snapped to **4px** then **rem**; font-size in rem) + shared tokens (`text-black-50`, `opacity-60`, `rounded-8`, `shadow-inset-1-white-10`, `bg-grad-*` / `text-grad-*` via `color-tokens` / `style-tokens`); omit defaults (`justify-start`, `text-left`, `font-400`, `tracking-0`); always emit `items-start` (CSS `align-items` defaults to stretch); positioning stays inline. Absolute nodes keep `position: absolute` (do not overwrite with relative for containing block).
 - Skip invisible nodes (`visible === false` or `opacity < 0.01`); skip empty mask sources; semantic tags for Button/Link layers only (`src/convert/semantics.ts`); all text → `<p>` (no heading tags); text truncation → `truncate` / `line-clamp-N`.
 - Icon fonts (including Font Awesome) → SVG file in `assets/` via `exportAsync` + `<img>` (no FA CDN in export).

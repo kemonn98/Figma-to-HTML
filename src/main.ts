@@ -2,6 +2,7 @@
 
 import type { ExportMessage } from './types';
 import { exportSelection } from './export/selection';
+import { sendExportResult } from './export/send';
 
 const SKIP_EXPORT_CHECKLIST_KEY = 'skipExportChecklist';
 
@@ -42,14 +43,7 @@ figma.ui.onmessage = (msg: ExportMessage) => {
     (async () => {
       try {
         const result = await exportSelection();
-        figma.ui.postMessage({
-          type: 'export-result',
-          html: result.html,
-          css: result.css,
-          frameWidth: result.frameWidth,
-          frameHeight: result.frameHeight,
-          assets: result.assets,
-        });
+        await sendExportResult(result);
       } catch (error) {
         figma.ui.postMessage({
           type: 'error',

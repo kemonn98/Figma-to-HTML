@@ -1,14 +1,14 @@
-import type { ExportAsset, ExportContext, ExportResult } from '../types';
+import type { ExportContext, ExportResult } from '../types';
 import { REM_BASE } from '../utils/color';
-import { uint8ToBase64 } from '../utils/html';
 import { isFontAwesomeFamily } from '../convert/text';
 import { nodeToHtmlCss } from '../convert/node';
 import {
   reportExportProgress,
   countExportableNodes,
-  countUniqueImageHashes,
+  collectImageHashPlans,
 } from './progress';
 import { buildCssVariablesBlock } from '../styles/variables';
+import { IMAGE_MAX_EXPORT_EDGE } from '../assets/images';
 
 export const exportSelection = async (): Promise<ExportResult> => {
   await reportExportProgress('Loading page…', 1);
@@ -24,7 +24,12 @@ export const exportSelection = async (): Promise<ExportResult> => {
   await reportExportProgress('Scanning layers…', 4);
   const progressTotal = Math.max(1, countExportableNodes(rootNode));
   const imageHashes = new Set<string>();
-  countUniqueImageHashes(rootNode, imageHashes);
+  const imageHashMaxEdge = new Map<string, number>();
+  collectImageHashPlans(rootNode, imageHashes, imageHashMaxEdge);
+  // Cap planned edges at global max
+  imageHashMaxEdge.forEach((edge, hash) => {
+    if (edge > IMAGE_MAX_EXPORT_EDGE) imageHashMaxEdge.set(hash, IMAGE_MAX_EXPORT_EDGE);
+  });
   const imageTotal = imageHashes.size;
   if (imageTotal > 0) {
     await reportExportProgress(
@@ -43,6 +48,7 @@ export const exportSelection = async (): Promise<ExportResult> => {
     assets: [],
     assetNameCounts: new Map<string, number>(),
     imageHashToFile: new Map<string, string>(),
+    imageHashMaxEdge,
     cssVariables: new Map<string, string>(),
     rootNode,
     rootHeight: rootNode.height,
@@ -100,21 +106,6 @@ ${bodyContent}
   </body>
 </html>`;
 
-  const assets: ExportAsset[] = [];
-  const assetCount = context.assets.length;
-  if (assetCount === 0) {
-    await reportExportProgress('Finishing export…', 98);
-  }
-  for (let i = 0; i < assetCount; i++) {
-    const a = context.assets[i];
-    const pct = 85 + ((i + 1) / assetCount) * 13;
-    await reportExportProgress(`Encoding asset ${i + 1}/${assetCount}… ${a.fileName}`, pct);
-    assets.push({
-      fileName: a.fileName,
-      bytesBase64: uint8ToBase64(a.bytes),
-      mimeType: a.mimeType,
-    });
-  }
-  await reportExportProgress('Finishing export…', 99);
-  return { html, css, frameWidth, frameHeight, assets };
+  // Binary assets are encoded and streamed to the UI by sendExportResult.
+  return { html, css, frameWidth, frameHeight, assets: context.assets };
 };

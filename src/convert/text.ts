@@ -14,6 +14,7 @@ import {
 import { assignStyleClasses, registerUtilityClass, splitInlineVsClassStyles } from '../styles/classes';
 import { decodeSvgBytes, normalizeSvgToNodeSize, registerSvgAsset, buildSvgImgHtml } from '../assets/svg';
 import { truncateLabel, reportExportProgress, overallPercentFromLayers } from '../export/progress';
+import { withExportSlot } from '../utils/async';
 
 const SEGMENT_FIELDS = [
   'fills',
@@ -582,7 +583,7 @@ export const convertText = async ({
         `Exporting icon SVG… ${truncateLabel(iconLabel)}`,
         overallPercentFromLayers(context)
       );
-      const svgBytes = await text.exportAsync({ format: 'SVG' });
+      const svgBytes = await withExportSlot(() => text.exportAsync({ format: 'SVG' }));
       let svgText = decodeSvgBytes(svgBytes);
       svgText = normalizeSvgToNodeSize(svgText, text.width, text.height);
       const svgPath = registerSvgAsset(iconLabel, svgText, context);

@@ -2,7 +2,7 @@
 
 Changelog and version history for **Figma to HTML** (Figma plugin: *Figma to Codes*).
 
-**Current version: `1.5.6`**
+**Current version: `1.5.7`**
 
 Source of truth for released history: commits on `main` → [kemonn98/Figma-to-HTML](https://github.com/kemonn98/Figma-to-HTML).  
 `package.json` should stay in sync with the version declared here.
@@ -20,6 +20,18 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 ---
 
 ## Unreleased
+
+---
+
+## 1.5.7 — 2026-07-12
+
+**Commit:** `pending`
+
+- Export: chunked asset transfer (`export-meta` → `export-asset` × N → `export-done`) to lower peak memory and reduce Figma crashes on large sites
+- Drop binary bytes after each base64 encode; defer live preview when total binary > ~20 MB (Load preview on demand; ZIP still works)
+- Guardrail: limit concurrent `exportAsync` slots (2) for vectors / masks / icon SVGs
+- Compress IMAGE fills before transfer: temp-rect `exportAsync` PNG with long-edge cap (1920 / 2× node); always PNG to preserve alpha
+- UI: more rotating Pro tips during export (assets, preview defer, naming, layout, masks, etc.)
 
 ---
 

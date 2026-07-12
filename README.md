@@ -32,7 +32,7 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 
 - **Header:** Title "Figma to Codes", version capsule, and short instructions.
 - **Export:** Opens a checklist modal (auto layout, assets, naming, clip tips) unless dismissed via “Don’t show this again” (`figma.clientStorage`); info icon reopens guidelines. After **Continue export**, shows a full-width status card (primary step + % in white, detail/filename in gray, 0–100% bar) plus rotating **Pro tips** below the status card.
-- **Download ZIP:** Builds a ZIP with HTML, CSS, and exported files under `assets/` (PNG images and SVG vectors; export first if needed). Filename: `figma-export.zip`.
+- **Download ZIP:** Builds a ZIP with HTML, CSS, and exported files under `assets/` (PNG images and SVG vectors; export first if needed). Filename: `figma-export.zip`. Large exports (total assets ≳20 MB) may skip the live preview to save memory; use **Load preview** when offered — ZIP download still works.
 - **Output panels:** Tabs for **HTML**, **CSS**, and **Assets** are visible on open (placeholders until export); then show code / asset list.
 - **Toasts:** Success/error only (e.g. "Export complete.", "Copied to clipboard.", "ZIP downloaded."); progress stays in the status card.
 - **Footer:** “Plugin by SlabPixel” (link) · **Readme** opens “Why this exists” (vibe-coding context for layout, not a 100% Figma→production generator).
@@ -52,7 +52,7 @@ Plugin logic lives under `src/` and is bundled to `code.js` with esbuild (`src/m
 - The UI sends `{ type: 'export' }` to the plugin code.
 - The plugin calls `exportSelection()` (`src/export/selection.ts`), which checks selection, builds an **export context**, and runs the tree walk.
 - The tree is converted recursively with `nodeToHtmlCss(...)` (`src/convert/node.ts`), which dispatches to per-type converters (`frame`, `group`, `text`, `rectangle`, `ellipse`, `vector`).
-- Result: `{ html, css, frameWidth, frameHeight, assets }`. HTML is a full document (doctype, head, body, optional Google Fonts links, link to `styles.css`). Image fills and icon/vector SVGs are written under `assets/` and referenced by relative path. CSS is written to `styles.css`.
+- Result: `{ html, css, frameWidth, frameHeight, assets }` (assets still as binary). IMAGE fills are re-encoded via a temporary rectangle + `exportAsync` PNG (long-edge capped at 1920 / ~2× node size; PNG preserves transparency), then `sendExportResult()` (`src/export/send.ts`) streams to the UI: `export-meta` → one `export-asset` per file (base64, then drop bytes) → `export-done`. Large asset totals defer live preview. HTML is a full document (doctype, head, body, optional Google Fonts links, link to `styles.css`). Image fills and icon/vector SVGs are written under `assets/` and referenced by relative path. CSS is written to `styles.css`.
 
 ### Node types supported
 

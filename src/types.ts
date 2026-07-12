@@ -1,15 +1,19 @@
+/** Base64 asset as received by the plugin UI (chunked transfer). */
 export type ExportAsset = {
   fileName: string;
   bytesBase64: string;
   mimeType: string;
 };
 
+export type PreviewMode = 'full' | 'deferred';
+
+/** Result of tree conversion; binary assets are streamed to the UI separately. */
 export type ExportResult = {
   html: string;
   css: string;
   frameWidth: number;
   frameHeight: number;
-  assets: ExportAsset[];
+  assets: ExportAssetInternal[];
 };
 
 export type ExportMessage =
@@ -41,6 +45,8 @@ export type ExportContext = {
   assets: ExportAssetInternal[];
   assetNameCounts: Map<string, number>;
   imageHashToFile: Map<string, string>;
+  /** Max export long-edge (px) per image hash, from node usage × retina, capped. */
+  imageHashMaxEdge: Map<string, number>;
   /** Collected Figma variables → CSS custom properties (`--token: value`). */
   cssVariables: Map<string, string>;
   rootNode: SceneNode | null;

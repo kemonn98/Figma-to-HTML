@@ -1,6 +1,10 @@
 import type { ExportContext } from '../types';
 import { sanitizeName } from '../utils/names';
 import { truncateLabel, reportExportProgress, overallPercentFromLayers } from '../export/progress';
+import { withExportSlot } from '../utils/async';
+
+/** Cap long edge of exported bitmaps (retina-friendly, anti-crash). */
+export const IMAGE_MAX_EXPORT_EDGE = 1920;
 
 export const hasImageFill = (node: GeometryMixin) => {
   if (!('fills' in node) || node.fills === figma.mixed) return false;
@@ -13,10 +17,61 @@ export const getFirstImagePaint = (node: GeometryMixin): ImagePaint | null => {
   return paint ?? null;
 };
 
+const clampExportEdge = (plannedEdge: number, sourceLongEdge: number): number =>
+  Math.max(1, Math.min(IMAGE_MAX_EXPORT_EDGE, plannedEdge, sourceLongEdge));
+
+/**
+ * Re-encode an IMAGE fill via a temporary rectangle + exportAsync (PNG + size cap).
+ * Always PNG so alpha/transparency is preserved (JPG fills transparent pixels with white).
+ * Temp node is always removed.
+ */
+export const exportCompressedImageBytes = async (
+  imageHash: string,
+  plannedEdge: number
+): Promise<{ bytes: Uint8Array; mimeType: string; ext: string }> => {
+  const image = figma.getImageByHash(imageHash);
+  if (!image) {
+    throw new Error('Image not found');
+  }
+  const size = await image.getSizeAsync();
+  const sourceLong = Math.max(size.width, size.height);
+  const targetLong = clampExportEdge(plannedEdge, sourceLong);
+
+  const landscape = size.width >= size.height;
+  const exportW = landscape
+    ? targetLong
+    : Math.max(1, Math.round((size.width / size.height) * targetLong));
+  const exportH = landscape
+    ? Math.max(1, Math.round((size.height / size.width) * targetLong))
+    : targetLong;
+  const constraint: ExportSettingsConstraints = landscape
+    ? { type: 'WIDTH', value: exportW }
+    : { type: 'HEIGHT', value: exportH };
+
+  const rect = figma.createRectangle();
+  try {
+    rect.name = '__figma_to_html_img_export__';
+    rect.x = -100000;
+    rect.y = -100000;
+    rect.resize(exportW, exportH);
+    rect.fills = [{ type: 'IMAGE', scaleMode: 'FILL', imageHash }];
+    const bytes = await withExportSlot(() =>
+      rect.exportAsync({
+        format: 'PNG',
+        constraint,
+      })
+    );
+    return { bytes, mimeType: 'image/png', ext: 'png' };
+  } finally {
+    rect.remove();
+  }
+};
+
 export const registerImageByHash = async (
   imageHash: string,
   nameHint: string,
-  context: ExportContext
+  context: ExportContext,
+  neededEdgeHint?: number
 ): Promise<string | null> => {
   const existing = context.imageHashToFile.get(imageHash);
   if (existing) return existing;
@@ -29,14 +84,33 @@ export const registerImageByHash = async (
     const label = truncateLabel(nameHint || 'image');
     const pct = overallPercentFromLayers(context);
     await reportExportProgress(`Exporting image ${imageIndex}/${imageTotal}… ${label}`, pct);
-    const bytes = await image.getBytesAsync();
+
+    const plannedFromScan = context.imageHashMaxEdge.get(imageHash) ?? 0;
+    let plannedEdge = Math.max(neededEdgeHint ?? 0, plannedFromScan);
+    if (plannedEdge < 1) plannedEdge = IMAGE_MAX_EXPORT_EDGE;
+
+    let bytes: Uint8Array;
+    let mimeType: string;
+    let ext: string;
+    try {
+      const compressed = await exportCompressedImageBytes(imageHash, plannedEdge);
+      bytes = compressed.bytes;
+      mimeType = compressed.mimeType;
+      ext = compressed.ext;
+    } catch {
+      // Fallback: original bytes if temp export fails
+      bytes = await image.getBytesAsync();
+      mimeType = 'image/png';
+      ext = 'png';
+    }
+
     await reportExportProgress(`Processing image ${imageIndex}/${imageTotal}… ${label}`, pct);
     const base = sanitizeName(nameHint) || 'img';
     const next = (context.assetNameCounts.get(base) ?? 0) + 1;
     context.assetNameCounts.set(base, next);
-    const fileName = next === 1 ? `${base}.png` : `${base}-${next}.png`;
+    const fileName = next === 1 ? `${base}.${ext}` : `${base}-${next}.${ext}`;
     const path = `assets/${fileName}`;
-    context.assets.push({ fileName, bytes, mimeType: 'image/png' });
+    context.assets.push({ fileName, bytes, mimeType });
     context.imageHashToFile.set(imageHash, path);
     return path;
   } catch {
@@ -50,7 +124,8 @@ export const registerImageAsset = async (
 ): Promise<string | null> => {
   const paint = getFirstImagePaint(node);
   if (!paint || !paint.imageHash) return null;
-  return registerImageByHash(paint.imageHash, node.name || 'img', context);
+  const neededEdge = Math.max(1, Math.round(Math.max(node.width, node.height) * 2));
+  return registerImageByHash(paint.imageHash, node.name || 'img', context, neededEdge);
 };
 
 export type ImageBgLayer = {
