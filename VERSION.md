@@ -25,7 +25,7 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 
 ## 1.5.8 — 2026-07-12
 
-**Commit:** `pending`
+**Commit:** `3e544a5`
 
 - UI: export progress + Pro tips in a popup modal with dark blurred backdrop
 - Plugin window height 730px; rename coverage doc to `FEATURES.md`
