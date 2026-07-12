@@ -37,7 +37,7 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 - **Toasts:** Success/error only (e.g. "Export complete.", "Copied to clipboard.", "ZIP downloaded."); progress stays in the progress modal.
 - **Footer:** “Plugin by SlabPixel” (link) · **Readme** opens “Why this exists” (vibe-coding context for layout, not a 100% Figma→production generator).
 
-The plugin UI is 370×600px.
+The plugin UI is 370×730px.
 
 Coverage of what maps to static HTML/CSS vs out of scope: [`FEATURES.md`](FEATURES.md).
 
