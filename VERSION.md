@@ -25,7 +25,7 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 
 ## 1.5.7 — 2026-07-12
 
-**Commit:** `pending`
+**Commit:** `b71c1b1`
 
 - Export: chunked asset transfer (`export-meta` → `export-asset` × N → `export-done`) to lower peak memory and reduce Figma crashes on large sites
 - Drop binary bytes after each base64 encode; defer live preview when total binary > ~20 MB (Load preview on demand; ZIP still works)
