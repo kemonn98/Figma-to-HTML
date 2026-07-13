@@ -22,7 +22,7 @@ Figma plugin that exports a selected **auto-layout or grid frame** to **HTML + C
 | `src/assets/` | Image/SVG asset registration |
 | `src/utils/` | Names, color/rem, HTML helpers, transform (flip/rotate), exportAsync slot |
 | `code.js` | Bundled output Figma loads (gitignored) — do not edit by hand |
-| `ui.html` | Plugin UI (checklist + progress + Readme modals, pro tips during export, HTML/CSS/Assets tabs, preview, ZIP) |
+| `ui.html` | Plugin UI (checklist + progress + Readme modals, pro tips, HTML/CSS/Assets tabs, preview with full-width/top fit + pan/zoom, ZIP) |
 | `manifest.json` | Figma plugin manifest (`main: code.js`) |
 | `tsconfig.json` | Typecheck only (`noEmit`); includes `@figma/plugin-typings` |
 | `previews/html/` | Local HTML/CSS preview samples |

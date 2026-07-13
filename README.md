@@ -31,7 +31,7 @@ The plugin walks the frame tree, maps Figma’s layout and styles to HTML elemen
 ## UI (ui.html)
 
 - **Header:** Title "Figma to Codes", version capsule, and short instructions.
-- **Export:** Opens a checklist modal (auto layout, assets, naming, clip tips) unless dismissed via “Don’t show this again” (`figma.clientStorage`); info icon reopens guidelines. After **Continue export**, a **progress modal** (dark blurred backdrop) shows the current step + % bar and rotating **Pro tips**.
+- **Export:** Opens a checklist modal (auto layout, assets, naming, clip tips) unless dismissed via “Don’t show this again” (`figma.clientStorage`); info icon reopens guidelines. After **Continue export**, a **progress modal** (dark blurred backdrop) shows the current step + % bar and rotating **Pro tips**. Preview defaults to full-width + top-aligned (header first), with zoom and drag-to-pan.
 - **Download ZIP:** Builds a ZIP with HTML, CSS, and exported files under `assets/` (PNG images and SVG vectors; export first if needed). Filename: `figma-export.zip`. Large exports (total assets ≳20 MB) may skip the live preview to save memory; use **Load preview** when offered — ZIP download still works.
 - **Output panels:** Tabs for **HTML**, **CSS**, and **Assets** are visible on open (placeholders until export); then show code / asset list.
 - **Toasts:** Success/error only (e.g. "Export complete.", "Copied to clipboard.", "ZIP downloaded."); progress stays in the progress modal.

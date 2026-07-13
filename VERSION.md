@@ -2,7 +2,7 @@
 
 Changelog and version history for **Figma to HTML** (Figma plugin: *Figma to Codes*).
 
-**Current version: `1.5.8`**
+**Current version: `1.5.9`**
 
 Source of truth for released history: commits on `main` → [kemonn98/Figma-to-HTML](https://github.com/kemonn98/Figma-to-HTML).  
 `package.json` should stay in sync with the version declared here.
@@ -20,6 +20,16 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 ---
 
 ## Unreleased
+
+---
+
+## 1.5.9 — 2026-07-13
+
+**Commit:** `pending`
+
+- UI: Preview stage background dark (`#0f0f0f`)
+- UI: Preview drag-to-pan with ±¾ export pad; vertical clamp top-anchored for tall pages
+- UI: Default preview fit full-width + top-aligned (header first)
 
 ---
 

@@ -141,11 +141,9 @@
   .preview-canvas-header {
     min-height: 36px;
     padding: 0 12px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 400;
     color: #ffffff;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
     background: #141414;
     border-bottom: 1px solid #262626;
     display: flex;
@@ -280,7 +278,12 @@
     min-height: 160px;
     height: 200px;
     border: none;
-    background: #1a1a1a;
+    background: #0f0f0f;
+    cursor: grab;
+    touch-action: none;
+  }
+  .preview-iframe.is-panning {
+    cursor: grabbing;
   }
 
   .btn-export .btn-export-dots {
@@ -865,7 +868,7 @@
     <div class="hero-inner">
       <div class="hero-title">
         <h1>Figma to Codes</h1>
-        <span class="version-capsule" title="Plugin version">v1.5.8</span>
+        <span class="version-capsule" title="Plugin version">v1.5.9</span>
       </div>
       <p>Select an auto-layout frame, then export.</p>
       <div class="export-actions">
@@ -886,7 +889,7 @@
           <span class="preview-canvas-header-title">Preview</span>
           <div class="preview-zoom">
             <button type="button" class="preview-zoom-btn" id="preview-zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
-            <span class="preview-zoom-label" id="preview-zoom-label">100%</span>
+            <span class="preview-zoom-label" id="preview-zoom-label" title="Drag preview to pan">100%</span>
             <button type="button" class="preview-zoom-btn" id="preview-zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
           </div>
         </div>
@@ -1076,6 +1079,13 @@
   var previewFrameHeight = 0;
   var previewFitScale = 1;
   var previewZoomLevel = 1;
+  var previewPanX = 0;
+  var previewPanY = 0;
+  var previewPanDragging = false;
+  var previewPanStartX = 0;
+  var previewPanStartY = 0;
+  var previewPanOriginX = 0;
+  var previewPanOriginY = 0;
 
   function renderHighlightedCode(displayId, code, language) {
     var el = document.getElementById(displayId);
@@ -1385,16 +1395,99 @@
     return { w: container.clientWidth || 260, h: iframe.offsetHeight || 200 };
   }
 
+  function getPreviewPanLimits() {
+    var scale = previewFitScale * previewZoomLevel;
+    var size = getPreviewContainerSize();
+    var scaledW = previewFrameWidth * scale;
+    var scaledH = previewFrameHeight * scale;
+    var padX = scaledW * 0.75;
+    var padY = scaledH * 0.75;
+    // Horizontal: still symmetric around center.
+    var maxX = padX;
+    var minX = -padX;
+    // Vertical is top-anchored (panY=0 = header at top).
+    // Overscroll above = padY; scroll through content then overscroll below = padY.
+    // Without this, ±padY from 0 makes top empty huge while the bottom stays unreachable.
+    var maxY = padY;
+    var minY = Math.min(0, size.h - scaledH) - padY;
+    return {
+      minX: minX,
+      maxX: Math.max(0, maxX),
+      minY: minY,
+      maxY: Math.max(0, maxY)
+    };
+  }
+
+  function clampPreviewPan() {
+    var lim = getPreviewPanLimits();
+    if (previewPanX > lim.maxX) previewPanX = lim.maxX;
+    if (previewPanX < lim.minX) previewPanX = lim.minX;
+    if (previewPanY > lim.maxY) previewPanY = lim.maxY;
+    if (previewPanY < lim.minY) previewPanY = lim.minY;
+  }
+
   function applyPreviewZoom() {
     var iframe = document.getElementById('preview-iframe');
     if (!iframe || !iframe.contentDocument) return;
     var root = iframe.contentDocument.getElementById('preview-root');
     if (!root) return;
+    clampPreviewPan();
     var scale = previewFitScale * previewZoomLevel;
-    root.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
-    root.style.transformOrigin = 'center center';
+    // Top-center anchor so tall landing pages show the header by default.
+    root.style.transform =
+      'translate(-50%, 0) translate(' + previewPanX + 'px, ' + previewPanY + 'px) scale(' + scale + ')';
+    root.style.transformOrigin = 'top center';
     var label = document.getElementById('preview-zoom-label');
     if (label) label.textContent = Math.round(scale * 100) + '%';
+  }
+
+  function bindPreviewPan(doc) {
+    if (!doc || !doc.body) return;
+    doc.body.style.cursor = 'grab';
+    doc.body.style.userSelect = 'none';
+    doc.body.style.webkitUserSelect = 'none';
+
+    function onPointerDown(e) {
+      if (e.button != null && e.button !== 0) return;
+      previewPanDragging = true;
+      previewPanStartX = e.clientX;
+      previewPanStartY = e.clientY;
+      previewPanOriginX = previewPanX;
+      previewPanOriginY = previewPanY;
+      doc.body.style.cursor = 'grabbing';
+      var iframe = document.getElementById('preview-iframe');
+      if (iframe) iframe.classList.add('is-panning');
+      try {
+        if (e.target && e.target.setPointerCapture && e.pointerId != null) {
+          e.target.setPointerCapture(e.pointerId);
+        }
+      } catch (err) { /* ignore */ }
+      e.preventDefault();
+    }
+
+    function onPointerMove(e) {
+      if (!previewPanDragging) return;
+      previewPanX = previewPanOriginX + (e.clientX - previewPanStartX);
+      previewPanY = previewPanOriginY + (e.clientY - previewPanStartY);
+      clampPreviewPan();
+      applyPreviewZoom();
+      e.preventDefault();
+    }
+
+    function onPointerUp(e) {
+      if (!previewPanDragging) return;
+      previewPanDragging = false;
+      doc.body.style.cursor = 'grab';
+      var iframe = document.getElementById('preview-iframe');
+      if (iframe) iframe.classList.remove('is-panning');
+      if (e) e.preventDefault();
+    }
+
+    doc.addEventListener('pointerdown', onPointerDown);
+    doc.addEventListener('pointermove', onPointerMove);
+    doc.addEventListener('pointerup', onPointerUp);
+    doc.addEventListener('pointercancel', onPointerUp);
+    doc.addEventListener('lostpointercapture', onPointerUp);
   }
 
   var lastExportAssets = [];
@@ -1527,12 +1620,15 @@
     previewFrameWidth = frameWidth > 0 ? frameWidth : 1;
     previewFrameHeight = frameHeight > 0 ? frameHeight : 1;
     previewZoomLevel = 1;
+    previewPanX = 0;
+    previewPanY = 0;
+    previewPanDragging = false;
     // Lock preview-root to artboard size so exported root `width: 100%` resolves
-    // against the design width — not the tiny iframe — before we scale to fit.
+    // against the design width — not the tiny iframe — before we scale to fit width.
     var fw = previewFrameWidth;
     var fh = previewFrameHeight;
     var scaleStyles =
-      'html,body{width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;overflow:hidden !important;background:#fff !important;position:relative !important;}' +
+      'html,body{width:100% !important;height:100% !important;margin:0 !important;padding:0 !important;overflow:hidden !important;background:#0f0f0f !important;position:relative !important;cursor:grab;}' +
       'body{box-sizing:border-box !important;}' +
       '#preview-root{' +
         'display:block;' +
@@ -1540,9 +1636,9 @@
         'height:' + fh + 'px;' +
         'position:absolute !important;' +
         'left:50% !important;' +
-        'top:50% !important;' +
-        'transform:translate(-50%, -50%) scale({{SCALE}});' +
-        'transform-origin:center center;' +
+        'top:0 !important;' +
+        'transform:translate(-50%, 0) scale({{SCALE}});' +
+        'transform-origin:top center;' +
         'overflow:visible;' +
       '}' +
       '#preview-root > *{' +
@@ -1567,13 +1663,14 @@
         '<div id="preview-root">' + (bodyHtml || '') + '</div></body></html>'
       );
       doc.close();
-      var label = document.getElementById('preview-zoom-label');
-      if (label) label.textContent = Math.round(initialScale * 100) + '%';
+      bindPreviewPan(doc);
+      applyPreviewZoom();
     }
     setTimeout(function() {
       var size = getPreviewContainerSize();
-      previewFitScale = Math.min(size.w / previewFrameWidth, size.h / previewFrameHeight);
-      if (previewFitScale > 1) previewFitScale = 1;
+      // Full-width fit (not contain) so tall pages keep header visible at the top.
+      previewFitScale = size.w / previewFrameWidth;
+      if (!(previewFitScale > 0) || !isFinite(previewFitScale)) previewFitScale = 1;
       var initialScale = previewFitScale * previewZoomLevel;
       writeIframe(initialScale);
     }, 0);
