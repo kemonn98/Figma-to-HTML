@@ -25,7 +25,7 @@ Source of truth for released history: commits on `main` → [kemonn98/Figma-to-H
 
 ## 1.5.9 — 2026-07-13
 
-**Commit:** `pending`
+**Commit:** `cd3cd94`
 
 - UI: Preview stage background dark (`#0f0f0f`)
 - UI: Preview drag-to-pan with ±¾ export pad; vertical clamp top-anchored for tall pages
